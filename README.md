@@ -74,3 +74,9 @@ $ sudo vi /etc/logrotate.d/iptables
   endscript
 }
 ```
+
+## ChangeLog
+
+### 0.0.1
+
+* 公開
