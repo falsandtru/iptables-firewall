@@ -3,7 +3,7 @@
 #
 # iptables firewall
 # 
-# @version 0.0.1
+# @version 0.0.2
 # @author falsandtru https://github.com/falsandtru/iptables/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -54,7 +54,7 @@ CACHE_DIR=/var/cache/iptables/
 echo "iptables firewall"
 
 # SSHポート取得
-[ ! 0 -gt $LOGIN ] && LOGIN=`cat /etc/ssh/sshd_config | grep ^Port | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
+[[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep ^Port | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
 LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
