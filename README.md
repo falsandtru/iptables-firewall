@@ -1,6 +1,7 @@
 # iptables firewall
 
 ルールを設定
+
 ```sh
 $ sudo mkdir /var/cache/iptables
 $ sudo touch /etc/cron.daily/iptables
@@ -76,6 +77,10 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.0.2
+
+* SSHポート自動設定機能が正常に動作しないバグを修正
 
 ### 0.0.1
 
