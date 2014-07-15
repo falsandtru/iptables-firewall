@@ -67,7 +67,6 @@ LOCALNET_ADDR=`netstat -rn|grep $LAN|grep $LOCALNET_MASK|cut -f1 -d' '`
 LOCALNET=$LOCALNET_ADDR/$LOCALNET_MASK
 
 # IP設定
-BROADCAST=$(ip -f inet addr show dev $LAN | grep brd | awk '{print $4}')
 NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
 NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}'))
 
