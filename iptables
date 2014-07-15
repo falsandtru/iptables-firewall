@@ -54,7 +54,7 @@ CACHE_DIR=/var/cache/iptables/
 echo "iptables firewall"
 
 # SSHポート取得
-[[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep ^Port | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
+[[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
 LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
