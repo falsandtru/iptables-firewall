@@ -81,7 +81,7 @@ NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +
 
 WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
 
-if [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
+if [ $RESTRICT = true ] || [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
     UPDATE=0
     echo "UPDATE:		NO"
 else
@@ -201,33 +201,39 @@ BUILD_COUNTRY(){
   done
 }
 
-if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]] ; then
-  echo "BUILD:		Chain COUNTRY_FILTER"
-  echo "BUILD:		Chain DROP_FILTER"
+if [ $RESTRICT != true ]; then
+  if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
+    echo "BUILD:		Chain COUNTRY_FILTER"
+    echo "BUILD:		Chain DROP_FILTER"
 
-  $IPTABLES -F COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -X COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -N COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -F COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -X COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -N COUNTRY_FILTER 2>/dev/null
 
-  $IPTABLES -F DROP_FILTER 2>/dev/null
-  $IPTABLES -X DROP_FILTER 2>/dev/null
-  $IPTABLES -N DROP_FILTER 2>/dev/null
+    $IPTABLES -F DROP_FILTER 2>/dev/null
+    $IPTABLES -X DROP_FILTER 2>/dev/null
+    $IPTABLES -N DROP_FILTER 2>/dev/null
 
-  BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
 
-  $IPTABLES -A COUNTRY_FILTER -j DROP
+    $IPTABLES -A COUNTRY_FILTER -j DROP
+  else
+    echo "REUSE:		Chain COUNTRY_FILTER"
+    echo "REUSE:		Chain DROP_FILTER"
+  fi
+
+  $IPTABLES -A INPUT -j DROP_FILTER
+  $IPTABLES -A OUTPUT -j DROP_FILTER
+  $IPTABLES -A FORWARD -j DROP_FILTER
 else
-  echo "REUSE:		Chain COUNTRY_FILTER"
-  echo "REUSE:		Chain DROP_FILTER"
+  $IPTABLES -N COUNTRY_FILTER 2>/dev/null
+  $IPTABLES -N DROP_FILTER 2>/dev/null
+  $IPTABLES -A COUNTRY_FILTER -j ACCEPT_FILTER
 fi
-
-$IPTABLES -A INPUT -j DROP_FILTER
-$IPTABLES -A OUTPUT -j DROP_FILTER
-$IPTABLES -A FORWARD -j DROP_FILTER
 
 
 #----------------------------------------------------------#

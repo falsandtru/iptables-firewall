@@ -81,6 +81,7 @@ $ sudo vi /etc/logrotate.d/iptables
 ### 0.1.0
 
 * IPS自動設定機能を追加
+* 厳格モード時に国別IP制限を行わないよう修正
 
 ### 0.0.2
 
