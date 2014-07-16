@@ -3,8 +3,8 @@
 #
 # iptables firewall
 # 
-# @version 0.0.2
-# @author falsandtru https://github.com/falsandtru/iptables/
+# @version 0.1.0
+# @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
 #
@@ -23,7 +23,7 @@ INTERVAL=7
 LAN=eth0
 
 # IPSの使用
-IPS=false
+IPS=
 
 # 許可 日本
 ACCEPT_COUNTRY_CODE="JP"
@@ -54,8 +54,12 @@ CACHE_DIR=/var/cache/iptables/
 echo "iptables firewall"
 
 # SSHポート取得
-[[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep ^Port | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
+[[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
+
+# IPS設定
+[ ! $IPS ] && IPS=`ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1`
+if [ $IPS ]; then IPS=Snort; else IPS=false; fi
 
 LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
 
@@ -67,7 +71,6 @@ LOCALNET_ADDR=`netstat -rn|grep $LAN|grep $LOCALNET_MASK|cut -f1 -d' '`
 LOCALNET=$LOCALNET_ADDR/$LOCALNET_MASK
 
 # IP設定
-BROADCAST=$(ip -f inet addr show dev $LAN | grep brd | awk '{print $4}')
 NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
 NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}'))
 
@@ -78,7 +81,7 @@ NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +
 
 WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
 
-if [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
+if [ $RESTRICT = true ] || [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
     UPDATE=0
     echo "UPDATE:		NO"
 else
@@ -198,33 +201,39 @@ BUILD_COUNTRY(){
   done
 }
 
-if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]] ; then
-  echo "BUILD:		Chain COUNTRY_FILTER"
-  echo "BUILD:		Chain DROP_FILTER"
+if [ $RESTRICT != true ]; then
+  if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
+    echo "BUILD:		Chain COUNTRY_FILTER"
+    echo "BUILD:		Chain DROP_FILTER"
 
-  $IPTABLES -F COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -X COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -N COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -F COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -X COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -N COUNTRY_FILTER 2>/dev/null
 
-  $IPTABLES -F DROP_FILTER 2>/dev/null
-  $IPTABLES -X DROP_FILTER 2>/dev/null
-  $IPTABLES -N DROP_FILTER 2>/dev/null
+    $IPTABLES -F DROP_FILTER 2>/dev/null
+    $IPTABLES -X DROP_FILTER 2>/dev/null
+    $IPTABLES -N DROP_FILTER 2>/dev/null
 
-  BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
 
-  $IPTABLES -A COUNTRY_FILTER -j DROP
+    $IPTABLES -A COUNTRY_FILTER -j DROP
+  else
+    echo "REUSE:		Chain COUNTRY_FILTER"
+    echo "REUSE:		Chain DROP_FILTER"
+  fi
+
+  $IPTABLES -A INPUT -j DROP_FILTER
+  $IPTABLES -A OUTPUT -j DROP_FILTER
+  $IPTABLES -A FORWARD -j DROP_FILTER
 else
-  echo "REUSE:		Chain COUNTRY_FILTER"
-  echo "REUSE:		Chain DROP_FILTER"
+  $IPTABLES -N COUNTRY_FILTER 2>/dev/null
+  $IPTABLES -N DROP_FILTER 2>/dev/null
+  $IPTABLES -A COUNTRY_FILTER -j ACCEPT_FILTER
 fi
-
-$IPTABLES -A INPUT -j DROP_FILTER
-$IPTABLES -A OUTPUT -j DROP_FILTER
-$IPTABLES -A FORWARD -j DROP_FILTER
 
 
 #----------------------------------------------------------#
@@ -381,8 +390,7 @@ $IPTABLES -A ANTI_INGRESS -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_B
 $IPTABLES -A ANTI_INGRESS -j FW_PROWLER
 $IPTABLES -A ANTI_INGRESS -j DROP
 $IPTABLES -N FW_INGRESS
-$IPTABLES -A FW_INGRESS -i eth+ ! -s $LOCALNET -j ANTI_INGRESS
-$IPTABLES -A FW_INGRESS -i ppp+ ! -s $LOCALNET -j ANTI_INGRESS
+$IPTABLES -A FW_INGRESS -i $LAN ! -s $LOCALNET -j ANTI_INGRESS
 $IPTABLES -A FORWARD -j FW_INGRESS && echo "FIREWALL:	ANTI_INGRESS		FORWARD"
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
@@ -645,7 +653,7 @@ fi
 
 $IPTABLES -D ACCEPT_FILTER 1
 
-if [ $IPS = true ]; then
+if [ $IPS = Snort ]; then
 
     # ICMPパケットをすべて解析
     $IPTABLES -A ACCEPT_FILTER -p icmp -j NFQUEUE --queue-num 2
