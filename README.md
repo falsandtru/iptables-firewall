@@ -78,6 +78,10 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.1.0
+
+* IPS自動設定機能を追加
+
 ### 0.0.2
 
 * SSHポート自動設定機能が正常に動作しないバグを修正

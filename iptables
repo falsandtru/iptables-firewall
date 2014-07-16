@@ -23,7 +23,7 @@ INTERVAL=7
 LAN=eth0
 
 # IPSの使用
-IPS=false
+IPS=
 
 # 許可 日本
 ACCEPT_COUNTRY_CODE="JP"
@@ -56,6 +56,10 @@ echo "iptables firewall"
 # SSHポート取得
 [[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
+
+# IPS設定
+[ ! $IPS ] && IPS=`ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1`
+if [ $IPS ]; then IPS=Snort; else IPS=false; fi
 
 LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
 
@@ -643,7 +647,7 @@ fi
 
 $IPTABLES -D ACCEPT_FILTER 1
 
-if [ $IPS = true ]; then
+if [ $IPS = Snort ]; then
 
     # ICMPパケットをすべて解析
     $IPTABLES -A ACCEPT_FILTER -p icmp -j NFQUEUE --queue-num 2
