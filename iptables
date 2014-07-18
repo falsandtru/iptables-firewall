@@ -3,7 +3,7 @@
 #
 # iptables firewall
 # 
-# @version 0.1.0
+# @version 0.1.1
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -469,8 +469,7 @@ $IPTABLES -A FW_STEALTHSCAN -o ppp+ -j RETURN
 $IPTABLES -A FW_STEALTHSCAN ! -p tcp -j RETURN
 $IPTABLES -A FW_STEALTHSCAN -p tcp --dport 0:1023 -j RETURN
 $IPTABLES -A FW_STEALTHSCAN -p tcp -m state ! --state NEW -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -p tcp -m state --state NEW ! --syn -j ANTI_STEALTHSCAN
-$IPTABLES -A FW_STEALTHSCAN -p tcp -m state --state NEW ! --tcp-flags ALL SYN -j ANTI_STEALTHSCAN
+# SYN + ACK when NEW
 $IPTABLES -A FW_STEALTHSCAN -p tcp -m state --state NEW --tcp-flags SYN,ACK SYN,ACK -j ANTI_STEALTHSCAN
 # FIN/PSH/URG without ACK
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ACK,FIN FIN -j ANTI_STEALTHSCAN

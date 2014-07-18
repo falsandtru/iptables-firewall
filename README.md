@@ -78,6 +78,10 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.1.1
+
+* アンチステルススキャンがkeep-aliveで誤作動する場合があるバグを修正
+
 ### 0.1.0
 
 * IPS自動設定機能を追加
