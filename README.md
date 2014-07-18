@@ -78,6 +78,10 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.1.2
+
+* 誤作動回避のため不正パケット発信元の追跡を取り消し
+
 ### 0.1.1
 
 * アンチステルススキャンがkeep-aliveで誤作動する場合があるバグを修正
