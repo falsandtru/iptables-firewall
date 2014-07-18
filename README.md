@@ -78,6 +78,10 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.1.3
+
+* IPS自動設定が正常に動作しないバグを修正
+
 ### 0.1.2
 
 * 誤作動回避のため不正パケット発信元の追跡を取り消し
