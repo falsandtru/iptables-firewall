@@ -3,7 +3,7 @@
 #
 # iptables firewall
 # 
-# @version 0.1.0
+# @version 0.1.1
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
