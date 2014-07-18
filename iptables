@@ -59,7 +59,7 @@ echo "LOGIN:		$LOGIN"
 
 # IPS設定
 [ ! $IPS ] && IPS=`ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1`
-if [ $IPS ]; then IPS=Snort; else IPS=false; fi
+if [ 1 = ${#IPS} ]; then IPS=Snort; elif [ ! $IPS ]; then IPS=false; fi
 
 LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
 
