@@ -34,7 +34,7 @@ DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
 # ブラックリスト/ホワイトリスト/厳格モード
 BLACKLIST=
 WHITELIST=
-RESTRICT=false
+STRICT=false
 
 # ログの最大生成間隔
 LOG_LIMIT=6/m
@@ -54,12 +54,17 @@ CACHE_DIR=/var/cache/iptables/
 echo "iptables firewall"
 
 # SSHポート取得
-[[ ! 0 -lt $LOGIN ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
+[[ ! $LOGIN -gt 0 ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
 # IPS設定
-[ ! $IPS ] && IPS=`ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1`
-if [ 1 = ${#IPS} ]; then IPS=Snort; elif [ ! $IPS ]; then IPS=false; fi
+if [ ! $IPS ] || [ $IPS != false ]; then
+    if [ `ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1` ]; then
+        IPS=Snort
+    else
+        IPS=false
+    fi
+fi
 
 LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
 
@@ -81,7 +86,7 @@ NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +
 
 WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
 
-if [ $RESTRICT = true ] || [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
+if [ $STRICT = true ] || [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
     UPDATE=0
     echo "UPDATE:		NO"
 else
@@ -201,7 +206,7 @@ BUILD_COUNTRY(){
   done
 }
 
-if [ $RESTRICT != true ]; then
+if [ $STRICT != true ]; then
   if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
     echo "BUILD:		Chain COUNTRY_FILTER"
     echo "BUILD:		Chain DROP_FILTER"
@@ -636,7 +641,7 @@ if [ $WHITELIST ] && [ -s $WHITELIST ]; then
   
   $IPTABLES -I BLACKLIST -g WHITELIST 2>/dev/null
   $IPTABLES -I DROP_FILTER -g WHITELIST
-  if [ $RESTRICT = true ]; then
+  if [ $STRICT = true ]; then
     $IPTABLES -A WHITELIST -j DROP
     $IPTABLES -A INPUT -j WHITELIST
     $IPTABLES -A FORWARD -j WHITELIST

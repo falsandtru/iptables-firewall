@@ -17,7 +17,7 @@ BLACKLIST/WHITELIST
 ```sh
 BLACKLIST=/etc/iptables/blacklist
 WHITELIST=/etc/iptables/whitelist
-RESTRICT=
+STRICT=
 ```
 
 ```
@@ -30,12 +30,12 @@ RESTRICT=
 1.2.3.4
 ```
 
-RESTRICT
+STRICT
 
 ```sh
 BLACKLIST=
 WHITELIST=/etc/iptables/whitelist
-RESTRICT=true
+STRICT=true
 ```
 
 ipv6を無効化
@@ -77,6 +77,10 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.1.4
+
+* IPS自動設定が正常に動作しないバグを修正
 
 ### 0.1.3
 
