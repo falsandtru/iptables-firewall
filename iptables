@@ -144,14 +144,16 @@ $IPTABLES -P FORWARD DROP
 
 $IPTABLES -N ACCEPT_FILTER 2>/dev/null
 
-if [ $SECURE != true ]; then
-  $IPTABLES -A ACCEPT_FILTER -j ACCEPT
-fi
-
 
 #----------------------------------------------------------#
 # Preprocess                                               #
 #----------------------------------------------------------#
+
+if [ $SECURE = true ]; then
+    $IPTABLES -A ACCEPT_FILTER -j DROP
+else
+    $IPTABLES -A ACCEPT_FILTER -j ACCEPT
+fi
 
 # ループバック(自身)のアクセスをすべて許可
 $IPTABLES -A INPUT -i lo -j ACCEPT_FILTER
@@ -160,11 +162,9 @@ $IPTABLES -A FORWARD -i lo -j ACCEPT_FILTER
 $IPTABLES -A FORWARD -o lo -j ACCEPT_FILTER
 
 # 確立した接続を切断しない
-if [ $SECURE != true ]; then
-  $IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
-  $IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j ACCEPT_FILTER
-  $IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
-fi
+$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
+$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j ACCEPT_FILTER
+$IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
 
 # 名前解決できるようにする
 for nameserver in ${NAMESERVERS[@]}; do
@@ -688,7 +688,7 @@ else
     echo "IDS/IPS:	DISABLE"
 fi
 
-# 一時ACCEPTを除去
+# 一時設定を除去
 $IPTABLES -D ACCEPT_FILTER 1
 
 
