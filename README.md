@@ -19,12 +19,14 @@ $ sudo sh /etc/cron.daily/iptables
 0. WHITELIST
 0. GRAYLIST
 0. BLACKLIST
-0. DROP_FILTER
 0. COUNTRY_FILTER
 0. ACCEPT_FILTER(Firewall, IPS/IDS)
 
 ### ACCEPT_FILTER
 Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
+
+### COUNTRY_FILTER
+IPの割り当て国に応じた許可/拒否/透過処理を行う。
 
 ### BLACKLIST
 一致するIPをDROPする。

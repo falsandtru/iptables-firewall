@@ -121,7 +121,7 @@ for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
         break
     fi
 
-    if [ $CHAIN != COUNTRY_FILTER ] && [ $CHAIN != DROP_FILTER ]; then
+    if [ $CHAIN != COUNTRY_FILTER ]; then
         $IPTABLES -F $CHAIN
     fi
 done
@@ -130,7 +130,7 @@ for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
         break
     fi
 
-    if [ $CHAIN != COUNTRY_FILTER ] && [ $CHAIN != DROP_FILTER ] && [ $CHAIN != ACCEPT_FILTER ]; then
+    if [ $CHAIN != COUNTRY_FILTER ] && [ $CHAIN != ACCEPT_FILTER ]; then
         if [ $CHAIN != INPUT ] && [ $CHAIN != FORWARD ] && [ $CHAIN != OUTPUT ]; then
             $IPTABLES -X $CHAIN
         fi
@@ -206,23 +206,18 @@ BUILD_COUNTRY(){
       $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j ACCEPT_FILTER
       printf "%-10s%-4s%-20s%s\n" ACCEPT $CODE $ADDR/$CIDR $line
     else
-      $IPTABLES -A DROP_FILTER -s $ADDR/$CIDR -j DROP
+      $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j DROP
       printf "%-10s%-4s%-20s%s\n" DROP   $CODE $ADDR/$CIDR $line
     fi
   done
 }
 
-if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
+if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
   echo "BUILD:		Chain COUNTRY_FILTER"
-  echo "BUILD:		Chain DROP_FILTER"
 
   $IPTABLES -F COUNTRY_FILTER 2>/dev/null
   $IPTABLES -X COUNTRY_FILTER 2>/dev/null
   $IPTABLES -N COUNTRY_FILTER 2>/dev/null
-
-  $IPTABLES -F DROP_FILTER 2>/dev/null
-  $IPTABLES -X DROP_FILTER 2>/dev/null
-  $IPTABLES -N DROP_FILTER 2>/dev/null
 
   BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
   BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
@@ -233,12 +228,7 @@ if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk '
   $IPTABLES -A COUNTRY_FILTER -j DROP
 else
   echo "REUSE:		Chain COUNTRY_FILTER"
-  echo "REUSE:		Chain DROP_FILTER"
 fi
-
-$IPTABLES -A INPUT -j DROP_FILTER
-$IPTABLES -A OUTPUT -j DROP_FILTER
-$IPTABLES -A FORWARD -j DROP_FILTER
 
 
 #----------------------------------------------------------#
