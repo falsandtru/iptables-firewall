@@ -56,11 +56,11 @@ CACHE_DIR=/var/cache/iptables/
 
 echo "iptables firewall"
 
-# SSHポート取得
+# SSHポート
 [[ ! $LOGIN -gt 0 ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
-# IPS設定
+# IPS/IDS
 if [ ! $IPS ] || [ $IPS != false ]; then
     if [ `ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1` ]; then
         IPS=Snort
@@ -107,35 +107,24 @@ fi
 # Initialize                                               #
 #----------------------------------------------------------#
 
-if [ 0 -ne $UPDATE ] && [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -mtime -$INTERVAL 2>&1) ]]; then
+if [ $UPDATE -ne 0 ] && [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -mtime -$INTERVAL 2>&1) ]]; then
     RESET=1
+    echo "DELETE:	All Chains"
+    $IPTABLES -F
+    $IPTABLES -X
 else
     RESET=0
-fi
-
-for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-    if [ $RESET -ne 0 ]; then
-        echo "DELETE:	All Chains"
-        $IPTABLES -F
-        $IPTABLES -X
-        break
-    fi
-
-    if [ $CHAIN != COUNTRY_FILTER ]; then
+    for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+        if [ COUNTRY_FILTER = $CHAIN ]; then continue;fi
         $IPTABLES -F $CHAIN
-    fi
-done
-for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-    if [ $RESET -ne 0 ]; then
-        break
-    fi
+    done
 
-    if [ $CHAIN != COUNTRY_FILTER ] && [ $CHAIN != ACCEPT_FILTER ]; then
-        if [ $CHAIN != INPUT ] && [ $CHAIN != FORWARD ] && [ $CHAIN != OUTPUT ]; then
-            $IPTABLES -X $CHAIN
-        fi
-    fi
-done
+    for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+        if [ COUNTRY_FILTER = $CHAIN ] || [ ACCEPT_FILTER = $CHAIN ]; then continue;fi
+        if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
+        $IPTABLES -X $CHAIN
+    done
+fi
 
 $IPTABLES -Z
 $IPTABLES -P INPUT DROP
@@ -212,22 +201,22 @@ BUILD_COUNTRY(){
   done
 }
 
-if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
-  echo "BUILD:		Chain COUNTRY_FILTER"
+if [ $RESET -ne 0 ] || [ $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
+    echo "BUILD:		Chain COUNTRY_FILTER"
 
-  $IPTABLES -F COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -X COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -N COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -F COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -X COUNTRY_FILTER 2>/dev/null
+    $IPTABLES -N COUNTRY_FILTER 2>/dev/null
 
-  BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-  BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
 
-  $IPTABLES -A COUNTRY_FILTER -j DROP
+    $IPTABLES -A COUNTRY_FILTER -j DROP
 else
-  echo "REUSE:		Chain COUNTRY_FILTER"
+    echo "REUSE:		Chain COUNTRY_FILTER"
 fi
 
 
