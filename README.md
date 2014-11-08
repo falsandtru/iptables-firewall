@@ -69,7 +69,7 @@ $ sudo vi /etc/logrotate.d/iptables
   compress
   missing ok
   notifempty
-  
+
   postrotate
     service rsyslog restart
   endscript
@@ -77,6 +77,13 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.1.5
+
+* WHITELISTが正常に動作しないバグを修正
+* テーブル名が適切に設定されていないバグを修正
+* ブルートフォース攻撃対策でNG処理がされていないバグを修正
+* ログ記録のバースト制限を緩和
 
 ### 0.1.4
 
