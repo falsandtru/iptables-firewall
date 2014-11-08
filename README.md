@@ -12,6 +12,15 @@ kern.=debug /var/log/iptables.log
 $ sudo sh /etc/cron.daily/iptables
 ```
 
+## 設定
+
+### SECURE
+有効にした場合、設定完了まですべての接続を切断、拒否する。無効でも新規の接続はすべて拒否する。初期値では無効。
+
+```sh
+SECURE=true
+```
+
 ## フィルタ
 
 ### 優先度
@@ -19,14 +28,22 @@ $ sudo sh /etc/cron.daily/iptables
 0. WHITELIST
 0. GRAYLIST
 0. BLACKLIST
+0. BLACKLIST_COUNTRY
 0. COUNTRY_FILTER
-0. ACCEPT_FILTER(Firewall, IPS/IDS)
+0. FIREWALL(Firewall, IPS/IDS)
 
-### ACCEPT_FILTER
+### FIREWALL
 Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
 
 ### COUNTRY_FILTER
-IPの割り当て国に応じた許可/拒否/透過処理を行う。
+許可した国のIPからのパケットをFIREWALLへ送り、それ以外のパケットは破棄する。
+
+国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+
+### BLACKLIST_COUNTRY
+拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
+
+国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
 
 ### BLACKLIST
 一致するIPをDROPする。
@@ -43,7 +60,7 @@ BLACKLIST=/etc/iptables/blacklist
 ```
 
 ### GRAYLIST
-一致するIPをACCEPT_FILTERへ転送する。
+一致するIPをFIREWALLへ転送する。
 
 DROP_FILTERとCOUTORY_FILTERによるフィルタを免除する。
 
@@ -70,17 +87,8 @@ WHITELIST=/etc/iptables/whitelist
 1.2.3.4
 ```
 
-## モード
-
-### SECURE
-更新時に接続を遮断する。
-
-```sh
-SECURE=true
-```
-
 ## ipv6の無効化
-無効化しなければv6のインターフェイスはノーガードで晒される。
+無効化しない場合、v6のインターフェイスはノーガードで晒される。
 
 ```sh
 $ sudo vi /etc/sysctl.conf
@@ -124,6 +132,8 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ### 0.2.0
 
+* CIDRへの変換が不完全であるバグを修正(初期設定では影響なし)
+* IPリストの適用を高速化
 * グレーリスト機能を追加
 * SECUREモードを追加
 * STRICTモードを削除

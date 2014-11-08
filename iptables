@@ -115,12 +115,12 @@ if [ $UPDATE -ne 0 ] && [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest
 else
     RESET=0
     for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-        if [ COUNTRY_FILTER = $CHAIN ]; then continue;fi
+        if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         $IPTABLES -F $CHAIN
     done
 
     for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-        if [ COUNTRY_FILTER = $CHAIN ] || [ FIREWALL = $CHAIN ]; then continue;fi
+        if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
         $IPTABLES -X $CHAIN
     done
@@ -178,45 +178,104 @@ done
 # CountryFilter                                            #
 #----------------------------------------------------------#
 
+CIDR_COUNT_LIST=()
+declare -A CIDR_TABLE
+for ((CIDR=32;0<CIDR;CIDR--))
+do
+    CIDR_COUNT=$(echo "2^(32-$CIDR)" | bc)
+    CIDR_COUNT_LIST=($CIDR_COUNT "${CIDR_COUNT_LIST[@]}")
+    CIDR_TABLE[$CIDR_COUNT]=$CIDR
+done
+
 BUILD_COUNTRY(){
-  if [ ! -s $CACHE_DIR$1 ] || [ ! $2 ] || [ ! $3 ];then return;fi
-  echo "LOAD:	$1"
-  for line in `cat $CACHE_DIR$1 | grep -E "\|($2|$3)\|ipv4\|"`
-  do
-    CODE=`echo $line | cut -d "|" -f 2`
-    ADDR=`echo $line | cut -d "|" -f 4`
-    TEMP=`echo $line | cut -d "|" -f 5`
-    CIDR=32
-    while [ $TEMP -ne 1 ]; do
-      TEMP=`expr "$TEMP" / 2`
-      CIDR=`expr "$CIDR" - 1`
+    if [ ! -s $CACHE_DIR$1 ] || [ ! $2 ] || [ ! $3 ];then return;fi
+    echo "LOAD:	$1"
+    local LINE
+    for LINE in `cat $CACHE_DIR$1 | grep -E "\|($2|$3)\|ipv4\|"`
+    do
+        local CODE=`echo $LINE | cut -d "|" -f 2`
+        local ADDR=`echo $LINE | cut -d "|" -f 4`
+        local COUNT=`echo $LINE | cut -d "|" -f 5`
+        local CIDR=32
+        if [ `echo $CODE | grep -E $2` ]; then
+            BUILD_COUNTRY_RULE $ADDR $COUNT BUILD_COUNTRY_RULE_ACCEPT
+            printf "%-10s%-4s%-20s%s\n" ACCEPT $CODE $ADDR/$? $LINE
+        elif [ `echo $CODE | grep -E $3` ]; then
+            BUILD_COUNTRY_RULE $ADDR $COUNT BUILD_COUNTRY_RULE_DROP
+            printf "%-10s%-4s%-20s%s\n" DROP   $CODE $ADDR/$? $LINE
+        fi
     done
-    if [ `echo $line | grep -E "\|($3)\|ipv4\|"` ]; then
-      $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j FIREWALL
-      printf "%-10s%-4s%-20s%s\n" ACCEPT $CODE $ADDR/$CIDR $line
-    else
-      $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j DROP
-      printf "%-10s%-4s%-20s%s\n" DROP   $CODE $ADDR/$CIDR $line
-    fi
-  done
+}
+BUILD_COUNTRY_RULE(){
+    local ADDR=$1
+    local COUNT=$2
+    local CALLBACK=$3
+    local CIDR_COUNT
+    for CIDR_COUNT in ${CIDR_COUNT_LIST[@]}
+    do
+        if [ $CIDR_COUNT -gt $COUNT ]; then continue;fi
+        local CIDR=${CIDR_TABLE[$CIDR_COUNT]}
+        eval "$CALLBACK $ADDR $CIDR"
+
+        if [ 0 -lt $(($COUNT-$CIDR_COUNT)) ]; then
+            ADDR=`SHIFT_ADDR $ADDR $CIDR_COUNT`
+            COUNT=$(($COUNT-$CIDR_COUNT))
+            BUILD_COUNTRY_RULE $ADDR $COUNT $CALLBACK
+        fi
+        return $CIDR
+    done
+}
+SHIFT_ADDR(){
+    local ADDR=$1
+    local COUNT=$2
+    local D1=$(($COUNT/(256**3)))
+    [ $D1 -ne 0 ] && COUNT=0
+    local D2=$(($COUNT/(256**2)))
+    [ $D2 -ne 0 ] && COUNT=0
+    local D3=$(($COUNT/(256**1)))
+    [ $D3 -ne 0 ] && COUNT=0
+    local D4=0
+    ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." 'NF == 4 { print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
+    echo $ADDR
+}
+BUILD_COUNTRY_RULE_ACCEPT(){
+    local ADDR=$1
+    local CIDR=$2
+    $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j FIREWALL
+}
+BUILD_COUNTRY_RULE_DROP(){
+    local ADDR=$1
+    local CIDR=$2
+    $IPTABLES -A BLACKLIST_COUNTRY -s $ADDR/$CIDR -j DROP
 }
 
-if [ $RESET -ne 0 ] || [ $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
+if [ $RESET -ne 0 ] || [ $ACCEPT_COUNTRY_CODE ] && [ $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
     echo "BUILD:		Chain COUNTRY_FILTER"
 
     $IPTABLES -F COUNTRY_FILTER 2>/dev/null
     $IPTABLES -X COUNTRY_FILTER 2>/dev/null
     $IPTABLES -N COUNTRY_FILTER 2>/dev/null
 
-    BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    $IPTABLES -F BLACKLIST_COUNTRY 2>/dev/null
+    $IPTABLES -X BLACKLIST_COUNTRY 2>/dev/null
+    $IPTABLES -N BLACKLIST_COUNTRY 2>/dev/null
+
+    BUILD_COUNTRY "delegated-apnic-extended-latest"   $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-arin-extended-latest"    $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-ripencc-extended-latest" $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-afrinic-extended-latest" $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
 
     $IPTABLES -A COUNTRY_FILTER -j DROP
 else
-    echo "REUSE:		Chain COUNTRY_FILTER"
+    [ $ACCEPT_COUNTRY_CODE ] && echo "REUSE:		Chain COUNTRY_FILTER"
+    [ $DROP_COUNTRY_CODE ] && echo "REUSE:		Chain BLACKLIST_COUNTRY"
+fi
+
+if [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -gt 2 ]; then
+    $IPTABLES -A INPUT -j BLACKLIST_COUNTRY
+    $IPTABLES -A FORWARD -j BLACKLIST_COUNTRY
+    $IPTABLES -A OUTPUT -j BLACKLIST_COUNTRY
 fi
 
 
