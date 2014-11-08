@@ -38,7 +38,7 @@ STRICT=false
 
 # ログの最大生成間隔
 LOG_LIMIT=6/m
-LOG_LIMIT_BURST=10
+LOG_LIMIT_BURST=1000
 
 # コマンド
 IPTABLES=iptables
