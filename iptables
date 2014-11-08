@@ -31,10 +31,13 @@ ACCEPT_COUNTRY_CODE="JP"
 # 拒否 中国|香港|マカオ|韓国|北朝鮮
 DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
 
-# ブラックリスト/ホワイトリスト/厳格モード
+# ブラックリスト/ホワイトリスト/グレーリスト/
 BLACKLIST=
+GRAYLIST=
 WHITELIST=
-STRICT=false
+
+# 厳格更新
+SECURE=false
 
 # ログの最大生成間隔
 LOG_LIMIT=6/m
@@ -86,7 +89,7 @@ NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +
 
 WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
 
-if [ $STRICT = true ] || [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
+if [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
     UPDATE=0
     echo "UPDATE:		NO"
 else
@@ -110,7 +113,6 @@ else
     RESET=0
 fi
 
-$IPTABLES -D DROP_FILTER -g WHITELIST 2>/dev/null
 for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
     if [ $RESET -ne 0 ]; then
         echo "DELETE:	All Chains"
@@ -141,7 +143,10 @@ $IPTABLES -P OUTPUT ACCEPT
 $IPTABLES -P FORWARD DROP
 
 $IPTABLES -N ACCEPT_FILTER 2>/dev/null
-$IPTABLES -A ACCEPT_FILTER -j ACCEPT
+
+if [ $SECURE != true ]; then
+  $IPTABLES -A ACCEPT_FILTER -j ACCEPT
+fi
 
 
 #----------------------------------------------------------#
@@ -155,10 +160,11 @@ $IPTABLES -A FORWARD -i lo -j ACCEPT_FILTER
 $IPTABLES -A FORWARD -o lo -j ACCEPT_FILTER
 
 # 確立した接続を切断しない
-# 設定完了まで切断されてもよいなら除外
-$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
-$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j ACCEPT_FILTER
-$IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
+if [ $SECURE != true ]; then
+  $IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
+  $IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j ACCEPT_FILTER
+  $IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
+fi
 
 # 名前解決できるようにする
 for nameserver in ${NAMESERVERS[@]}; do
@@ -206,39 +212,33 @@ BUILD_COUNTRY(){
   done
 }
 
-if [ $STRICT != true ]; then
-  if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
-    echo "BUILD:		Chain COUNTRY_FILTER"
-    echo "BUILD:		Chain DROP_FILTER"
+if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
+  echo "BUILD:		Chain COUNTRY_FILTER"
+  echo "BUILD:		Chain DROP_FILTER"
 
-    $IPTABLES -F COUNTRY_FILTER 2>/dev/null
-    $IPTABLES -X COUNTRY_FILTER 2>/dev/null
-    $IPTABLES -N COUNTRY_FILTER 2>/dev/null
-
-    $IPTABLES -F DROP_FILTER 2>/dev/null
-    $IPTABLES -X DROP_FILTER 2>/dev/null
-    $IPTABLES -N DROP_FILTER 2>/dev/null
-
-    BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-
-    $IPTABLES -A COUNTRY_FILTER -j DROP
-  else
-    echo "REUSE:		Chain COUNTRY_FILTER"
-    echo "REUSE:		Chain DROP_FILTER"
-  fi
-
-  $IPTABLES -A INPUT -j DROP_FILTER
-  $IPTABLES -A OUTPUT -j DROP_FILTER
-  $IPTABLES -A FORWARD -j DROP_FILTER
-else
+  $IPTABLES -F COUNTRY_FILTER 2>/dev/null
+  $IPTABLES -X COUNTRY_FILTER 2>/dev/null
   $IPTABLES -N COUNTRY_FILTER 2>/dev/null
+
+  $IPTABLES -F DROP_FILTER 2>/dev/null
+  $IPTABLES -X DROP_FILTER 2>/dev/null
   $IPTABLES -N DROP_FILTER 2>/dev/null
-  $IPTABLES -A COUNTRY_FILTER -j ACCEPT_FILTER
+
+  BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+  BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+  BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+  BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+  BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+
+  $IPTABLES -A COUNTRY_FILTER -j DROP
+else
+  echo "REUSE:		Chain COUNTRY_FILTER"
+  echo "REUSE:		Chain DROP_FILTER"
 fi
+
+$IPTABLES -A INPUT -j DROP_FILTER
+$IPTABLES -A OUTPUT -j DROP_FILTER
+$IPTABLES -A FORWARD -j DROP_FILTER
 
 
 #----------------------------------------------------------#
@@ -621,46 +621,54 @@ $IPTABLES -A ACCEPT_FILTER -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE		
 
 
 #----------------------------------------------------------#
-# BLACKLIST/WHITELIST                                      #
+# BLACKLIST/GRAYLIST/WHITELIST                             #
 #----------------------------------------------------------#
 
 # ブラックリストに一致するIPをDROPする
+$IPTABLES -N BLACKLIST
 if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-  $IPTABLES -N BLACKLIST 2>/dev/null
   for line in `cat $BLACKLIST | grep ^[0-9]`
   do
     $IPTABLES -A BLACKLIST -s $line -j DROP
   done
 
-  $IPTABLES -A INPUT -j BLACKLIST
-  $IPTABLES -A FORWARD -j BLACKLIST
-  $IPTABLES -A OUTPUT -j BLACKLIST
+  $IPTABLES -I INPUT -j BLACKLIST
+  $IPTABLES -I FORWARD -j BLACKLIST
+  $IPTABLES -I OUTPUT -j BLACKLIST
 fi
 
-# ホワイトリストに一致しないIPをDROPする
+# グレーリストに一致するIPをACCEPT_FILTERへ転送する
+$IPTABLES -N GRAYLIST
+if [ $GRAYLIST ] && [ -s $GRAYLIST ]; then
+  for line in `cat $GRAYLIST | grep ^[0-9]`
+  do
+    $IPTABLES -A GRAYLIST -s $line -j ACCEPT_FILTER
+  done
+
+  $IPTABLES -I INPUT -j GRAYLIST
+  $IPTABLES -I FORWARD -j GRAYLIST
+  $IPTABLES -I OUTPUT -j GRAYLIST
+fi
+
+# ホワイトリストに一致するIPをACCEPTする
+$IPTABLES -N WHITELIST
 if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-  $IPTABLES -N WHITELIST 2>/dev/null
   for line in `cat $WHITELIST | grep ^[0-9]`
   do
     $IPTABLES -A WHITELIST -s $line -j ACCEPT
   done
 
-  $IPTABLES -I BLACKLIST -g WHITELIST 2>/dev/null
-  $IPTABLES -I DROP_FILTER -g WHITELIST
-  if [ $STRICT = true ]; then
-    $IPTABLES -A WHITELIST -j DROP
-    $IPTABLES -A INPUT -j WHITELIST
-    $IPTABLES -A FORWARD -j WHITELIST
-    $IPTABLES -A OUTPUT -j WHITELIST
-  fi
+  $IPTABLES -I INPUT -j WHITELIST
+  $IPTABLES -I FORWARD -j WHITELIST
+  $IPTABLES -I OUTPUT -j WHITELIST
+
+  $IPTABLES -A WHITELIST -j DROP
 fi
 
 
 #----------------------------------------------------------#
 # IDS/IPS                                                  #
 #----------------------------------------------------------#
-
-$IPTABLES -D ACCEPT_FILTER 1
 
 if [ $IPS = Snort ]; then
 
@@ -689,6 +697,9 @@ else
     $IPTABLES -A ACCEPT_FILTER -j ACCEPT
     echo "IDS/IPS:	DISABLE"
 fi
+
+# 一時ACCEPTを除去
+$IPTABLES -D ACCEPT_FILTER 1
 
 
 #----------------------------------------------------------#

@@ -1,6 +1,6 @@
 # iptables firewall
 
-ルールを設定
+## 使用方法
 
 ```sh
 $ sudo mkdir /var/cache/iptables
@@ -12,12 +12,27 @@ kern.=debug /var/log/iptables.log
 $ sudo sh /etc/cron.daily/iptables
 ```
 
-BLACKLIST/WHITELIST
+## フィルタ
+
+### 優先度
+
+0. WHITELIST
+0. GRAYLIST
+0. BLACKLIST
+0. DROP_FILTER
+0. COUNTRY_FILTER
+0. ACCEPT_FILTER(Firewall, IPS/IDS)
+
+### ACCEPT_FILTER
+Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
+
+### BLACKLIST
+一致するIPをDROPする。
+
+有害なIPを早期にフィルタすることでiptablesの負荷を軽減する。
 
 ```sh
 BLACKLIST=/etc/iptables/blacklist
-WHITELIST=/etc/iptables/whitelist
-STRICT=
 ```
 
 ```
@@ -25,20 +40,46 @@ STRICT=
 1.2.3.0/24
 ```
 
+### GRAYLIST
+一致するIPをACCEPT_FILTERへ転送する。
+
+DROP_FILTERとCOUTORY_FILTERによるフィルタを免除する。
+
+```sh
+GRAYLIST=/etc/iptables/graylist
+```
+
+```
+# GRAYLIST
+1.2.3.3
+```
+
+### WHITELIST
+一致するIPをACCEPTする。
+
+WHITELISTを設定した場合、WHITELISTに一致しないすべてのIPを遮断する。
+
+```sh
+WHITELIST=/etc/iptables/whitelist
+```
+
 ```
 # WHITELIST
 1.2.3.4
 ```
 
-STRICT
+## モード
+
+### SECURE
+更新時に接続を遮断する。
 
 ```sh
-BLACKLIST=
-WHITELIST=/etc/iptables/whitelist
-STRICT=true
+SECURE=true
 ```
 
-ipv6を無効化
+## ipv6の無効化
+無効化しなければv6のインターフェイスはノーガードで晒される。
+
 ```sh
 $ sudo vi /etc/sysctl.conf
 # ipv6 disable
@@ -59,7 +100,8 @@ $ netstat -an -A inet6
 $ lsmod | grep ipv6 # モジュール自体はロードさせる
 ```
 
-ログローテート
+## ログローテート
+
 ```sh
 $ sudo service rsyslog restart
 $ sudo vi /etc/logrotate.d/iptables
@@ -77,6 +119,12 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.2.0
+
+* グレーリスト機能を追加
+* SECUREモードを追加
+* STRICTモードを削除
 
 ### 0.1.5
 
