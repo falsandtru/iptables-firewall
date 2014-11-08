@@ -637,7 +637,7 @@ if [ $WHITELIST ] && [ -s $WHITELIST ]; then
   $IPTABLES -N WHITELIST 2>/dev/null
   for line in `cat $WHITELIST | grep ^[0-9]`
   do
-    $IPTABLES -A WHITELIST -s $line -j RETURN
+    $IPTABLES -A WHITELIST -s $line -j ACCEPT
   done
 
   $IPTABLES -I BLACKLIST -g WHITELIST 2>/dev/null
