@@ -69,7 +69,7 @@ $ sudo vi /etc/logrotate.d/iptables
   compress
   missing ok
   notifempty
-  
+
   postrotate
     service rsyslog restart
   endscript
@@ -77,6 +77,10 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.1.5
+
+* テーブル名が適切に設定されていないバグを修正
 
 ### 0.1.4
 
