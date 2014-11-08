@@ -607,6 +607,7 @@ $IPTABLES -A ANTI_BRUTEFORCE \
           --hashlimit-htable-expire 180000 \
           -j RETURN
 $IPTABLES -A ANTI_BRUTEFORCE -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES BRUTEFORCE] : '
+$IPTABLES -A ANTI_BRUTEFORCE -j FW_PROWLER
 $IPTABLES -A ANTI_BRUTEFORCE -j DROP
 $IPTABLES -N FW_BRUTEFORCE
 $IPTABLES -A FW_BRUTEFORCE -i eth+ -p tcp -m multiport --dports $LOGIN -m state --syn --state NEW -j ANTI_BRUTEFORCE
