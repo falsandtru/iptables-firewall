@@ -2,7 +2,7 @@
 
 #
 # iptables firewall
-# 
+#
 # @version 0.1.4
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
@@ -289,12 +289,12 @@ echo "net.ipv4.tcp_timestamps=1" >> /etc/sysctl.conf
 
 # 不正なアクセスを行ったIPからのすべてのアクセスをログを記録して破棄
 # ※調査的アクセスから公開ポートを隠蔽する
-# ※公開サーバーでは無効にしてよい
+# ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_SPY
 $IPTABLES -A ANTI_SPY -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPY] : '
 $IPTABLES -A ANTI_SPY -j DROP
 $IPTABLES -N FW_SPY
-# 公開サーバーでは既知のポートはフィルタしない
+# 公表サーバーでは既知のポートはフィルタしない
 $IPTABLES -A FW_SPY -p tcp --dport 0:1023 -j RETURN
 $IPTABLES -A FW_SPY -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-rapid --update --rttl -j ANTI_SPY
@@ -305,7 +305,7 @@ $IPTABLES -A ACCEPT_FILTER -j FW_SPY && echo "FIREWALL:	ANTI_SPY		ACCEPT_FILTER"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
-# 管理機能を持つサーバーは攻撃価値を特定され本格的な攻撃を受けないよう非公開サーバーに分離隠蔽する必要がある
+# 管理機能を持つサーバーは攻撃価値を特定され本格的な攻撃を受けないよう非公表サーバーに分離隠蔽する必要がある
 # $ vi /etc/modprobe.d/iptables-recent.conf
 # options ip_list_hash_size=0 xt_recent ip_list_tot=1000
 # $ reboot
@@ -315,7 +315,7 @@ $IPTABLES -A ACCEPT_FILTER -j FW_SPY && echo "FIREWALL:	ANTI_SPY		ACCEPT_FILTER"
 # 不審なアクセスを行っているIPをスパイとして記録
 # ※不審なアクセスを長時間追跡する
 # ※正規の通信のフィルタとして使用不可
-# ※公開サーバーでは無効にしてよい
+# ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_PROWLER_RAPID
 $IPTABLES -A ANTI_PROWLER_RAPID -m recent --name spy-rapid --update --rttl -j DROP
 $IPTABLES -A ANTI_PROWLER_RAPID -m recent --name spy-rapid --set -j DROP
@@ -447,13 +447,13 @@ $IPTABLES -N FW_INVALID
 $IPTABLES -A FW_INVALID -m state --state INVALID -j DENY_INVALID
 $IPTABLES -A ACCEPT_FILTER -j FW_INVALID && echo "FIREWALL:	DENY_INVALID		ACCEPT_FILTER"
 
-# フラグの不正なパケットを破棄、16分間に3回を超えたらログを記録してNG
+# フラグの不正なパケットを破棄、1時間に3回を超えたらログを記録してNG
 # ※ステルススキャン対策
 # ※既知のポートはもともと隠密性がないため保護せず誤作動の回避を優先
 # ※SSHの終了処理をしないで切断されると簡単に自爆するので注意
 # ※FW_PORTSCANとFW_SPYが機能しているうちは有効にする必要性は低い
 # ※フラグパターンの妥当性未検証
-# ※公開サーバーでは無効にしてよい
+# ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_STEALTHSCAN
 $IPTABLES -A ANTI_STEALTHSCAN \
           -m hashlimit \
@@ -527,7 +527,7 @@ $IPTABLES -A ACCEPT_FILTER -j FW_PINGDEATH && echo "FIREWALL:	ANTI_PINGDEATH		AC
 # --hashlimit-mode hash        ：同一アクセスとしてカウントする識別基準
 # --hashlimit-htable-expire ms ：ハッシュテーブル内のレコードの有効期間(単位：ミリ秒)
 #
-# HTTPポートへの過大なアクセスを拒否
+# HTTPポートへの過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_SYNFLOOD
 $IPTABLES -A ANTI_SYNFLOOD \
           -m hashlimit \
@@ -544,7 +544,7 @@ $IPTABLES -A FW_SYNFLOOD -i eth+ -p tcp --dport 80 -m state --state NEW -j ANTI_
 $IPTABLES -A FW_SYNFLOOD -i ppp+ -p tcp --dport 80 -m state --state NEW -j ANTI_SYNFLOOD
 $IPTABLES -A ACCEPT_FILTER -j FW_SYNFLOOD && echo "FIREWALL:	ANTI_SYNFLOOD		ACCEPT_FILTER[TCP:80]"
 #
-# HTTPSポートへの過大なアクセスを拒否
+# HTTPSポートへの過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_SYNFLOOD_SSL
 $IPTABLES -A ANTI_SYNFLOOD_SSL \
           -m hashlimit \
@@ -561,7 +561,7 @@ $IPTABLES -A FW_SYNFLOOD_SSL -i eth+ -p tcp --dport 443 -m state --state NEW -j 
 $IPTABLES -A FW_SYNFLOOD_SSL -i ppp+ -p tcp --dport 443 -m state --state NEW -j ANTI_SYNFLOOD_SSL
 $IPTABLES -A ACCEPT_FILTER -j FW_SYNFLOOD_SSL && echo "FIREWALL:	ANTI_SYNFLOOD_SSL	ACCEPT_FILTER[TCP:443]"
 #
-# UDPによる過大なアクセスを拒否
+# UDPによる過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_UDPFLOOD
 $IPTABLES -A ANTI_UDPFLOOD \
           -m hashlimit \
@@ -578,7 +578,7 @@ $IPTABLES -A FW_UDPFLOOD -i eth+ -p udp -m state --state NEW -j ANTI_UDPFLOOD
 $IPTABLES -A FW_UDPFLOOD -i ppp+ -p udp -m state --state NEW -j ANTI_UDPFLOOD
 $IPTABLES -A ACCEPT_FILTER -j FW_UDPFLOOD && echo "FIREWALL:	ANTI_UDPFLOOD		ACCEPT_FILTER[UDP]"
 #
-# ICMPによる過大なアクセスを拒否
+# ICMPによる過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_ICMPFLOOD
 $IPTABLES -A ANTI_ICMPFLOOD \
           -m hashlimit \
@@ -595,7 +595,7 @@ $IPTABLES -A FW_ICMPFLOOD -i eth+ -p icmp --icmp-type echo-request -j ANTI_ICMPF
 $IPTABLES -A FW_ICMPFLOOD -i ppp+ -p icmp --icmp-type echo-request -j ANTI_ICMPFLOOD
 $IPTABLES -A ACCEPT_FILTER -j FW_ICMPFLOOD && echo "FIREWALL:	ANTI_ICMPFLOOD		ACCEPT_FILTER[ICMP]"
 
-# 管理用ポートへ3分間に10回を超えて接続試行しているIPを拒否してNG
+# 管理用ポートへ3分間に10回を超えて接続試行をログを記録して破棄してNG
 # ※Brute Force攻撃対策
 $IPTABLES -N ANTI_BRUTEFORCE
 $IPTABLES -A ANTI_BRUTEFORCE \
@@ -625,7 +625,7 @@ if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
   do
     $IPTABLES -A BLACKLIST -s $line -j DROP
   done
-  
+
   $IPTABLES -A INPUT -j BLACKLIST
   $IPTABLES -A FORWARD -j BLACKLIST
   $IPTABLES -A OUTPUT -j BLACKLIST
@@ -638,7 +638,7 @@ if [ $WHITELIST ] && [ -s $WHITELIST ]; then
   do
     $IPTABLES -A WHITELIST -s $line -j RETURN
   done
-  
+
   $IPTABLES -I BLACKLIST -g WHITELIST 2>/dev/null
   $IPTABLES -I DROP_FILTER -g WHITELIST
   if [ $STRICT = true ]; then
@@ -758,7 +758,7 @@ $IPTABLES -A INPUT -p tcp --dport 443 -j COUNTRY_FILTER && echo "OPEN:		HTTPS[TC
 # 公開していないポートへのパケットをログを記録して破棄してNG
 # ※ポートスキャン対策
 # ※開けていないポートに1度でも触ったらアウト
-# ※公開サーバーでは無効にしてよい
+# ※公表サーバーでは無効にしてよい
 $IPTABLES -N TRAP_PORTSCAN
 $IPTABLES -A TRAP_PORTSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
 $IPTABLES -A TRAP_PORTSCAN -j FW_PROWLER
