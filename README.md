@@ -132,6 +132,7 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ### 0.2.0
 
+* OUTPUTチェーンのポリシーをDROPに変更
 * CIDRへの変換が不完全であるバグを修正(初期設定では影響なし)
 * IPリストの適用を高速化
 * グレーリスト機能を追加
