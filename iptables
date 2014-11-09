@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.2.0
+# @version 0.2.1
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -234,8 +234,17 @@ SHIFT_ADDR(){
     [ $D2 -ne 0 ] && COUNT=0
     local D3=$(($COUNT/(256**1)))
     [ $D3 -ne 0 ] && COUNT=0
-    local D4=0
-    ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." 'NF == 4 { print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
+    local D4=$(($COUNT/(256**0)))
+    ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." '{ print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
+    ADDR=(`echo " "$ADDR | tr -s '.' ' '`)
+    local I
+    for ((I=$((${#ADDR[@]}-1));0<=I;I--))
+    do
+        if [ ${ADDR[I]} -le 255 ]; then continue;fi
+        ADDR[$I]=$((${ADDR[I]}-255))
+        ADDR[$I-1]=$((ADDR[$I-1]+1))
+    done
+    ADDR="$(IFS='.'; echo "${ADDR[*]}")"
     echo $ADDR
 }
 BUILD_COUNTRY_RULE_ACCEPT(){
@@ -249,7 +258,7 @@ BUILD_COUNTRY_RULE_DROP(){
     $IPTABLES -A BLACKLIST_COUNTRY -s $ADDR/$CIDR -j DROP
 }
 
-if [ $RESET -ne 0 ] || [ $ACCEPT_COUNTRY_CODE ] && [ $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
+if [ $RESET -ne 0 ] || [ $ACCEPT_COUNTRY_CODE -a $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ $DROP_COUNTRY_CODE -a $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
     echo "BUILD:		Chain COUNTRY_FILTER"
 
     $IPTABLES -F COUNTRY_FILTER 2>/dev/null
