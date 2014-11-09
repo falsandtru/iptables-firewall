@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.1.5
+# @version 0.2.0
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -31,7 +31,7 @@ ACCEPT_COUNTRY_CODE="JP"
 # 拒否 中国|香港|マカオ|韓国|北朝鮮
 DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
 
-# ブラックリスト/ホワイトリスト/グレーリスト/
+# ブラックリスト/ホワイトリスト/グレーリスト
 BLACKLIST=
 GRAYLIST=
 WHITELIST=
