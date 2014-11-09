@@ -21,7 +21,7 @@ $ sudo sh /etc/cron.daily/iptables
 SECURE=true
 ```
 
-## フィルタ
+## チェーン
 
 ### 優先度
 
@@ -62,7 +62,7 @@ BLACKLIST=/etc/iptables/blacklist
 ### GRAYLIST
 一致するIPをFIREWALLへ転送する。
 
-DROP_FILTERとCOUTORY_FILTERによるフィルタを免除する。
+BLACKLIST_COUNTRYとCOUTORY_FILTERによるフィルタを免除する。
 
 ```sh
 GRAYLIST=/etc/iptables/graylist
