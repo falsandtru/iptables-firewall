@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.1.5
+# @version 0.2.0
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -31,10 +31,13 @@ ACCEPT_COUNTRY_CODE="JP"
 # 拒否 中国|香港|マカオ|韓国|北朝鮮
 DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
 
-# ブラックリスト/ホワイトリスト/厳格モード
+# ブラックリスト/ホワイトリスト/グレーリスト
 BLACKLIST=
+GRAYLIST=
 WHITELIST=
-STRICT=false
+
+# 厳格更新
+SECURE=false
 
 # ログの最大生成間隔
 LOG_LIMIT=6/m
@@ -53,11 +56,11 @@ CACHE_DIR=/var/cache/iptables/
 
 echo "iptables firewall"
 
-# SSHポート取得
+# SSHポート
 [[ ! $LOGIN -gt 0 ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
-# IPS設定
+# IPS/IDS
 if [ ! $IPS ] || [ $IPS != false ]; then
     if [ `ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1` ]; then
         IPS=Snort
@@ -86,7 +89,7 @@ NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +
 
 WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
 
-if [ $STRICT = true ] || [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
+if [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
     UPDATE=0
     echo "UPDATE:		NO"
 else
@@ -104,77 +107,69 @@ fi
 # Initialize                                               #
 #----------------------------------------------------------#
 
-if [ 0 -ne $UPDATE ] && [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -mtime -$INTERVAL 2>&1) ]]; then
+if [ $UPDATE -ne 0 ] && [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -mtime -$INTERVAL 2>&1) ]]; then
     RESET=1
+    echo "DELETE:	All Chains"
+    $IPTABLES -F
+    $IPTABLES -X
 else
     RESET=0
-fi
-
-$IPTABLES -D DROP_FILTER -g WHITELIST 2>/dev/null
-for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-    if [ $RESET -ne 0 ]; then
-        echo "DELETE:	All Chains"
-        $IPTABLES -F
-        $IPTABLES -X
-        break
-    fi
-
-    if [ $CHAIN != COUNTRY_FILTER ] && [ $CHAIN != DROP_FILTER ]; then
+    for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+        if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         $IPTABLES -F $CHAIN
-    fi
-done
-for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-    if [ $RESET -ne 0 ]; then
-        break
-    fi
+    done
 
-    if [ $CHAIN != COUNTRY_FILTER ] && [ $CHAIN != DROP_FILTER ] && [ $CHAIN != ACCEPT_FILTER ]; then
-        if [ $CHAIN != INPUT ] && [ $CHAIN != FORWARD ] && [ $CHAIN != OUTPUT ]; then
-            $IPTABLES -X $CHAIN
-        fi
-    fi
-done
+    for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+        if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
+        if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
+        $IPTABLES -X $CHAIN
+    done
+fi
 
 $IPTABLES -Z
 $IPTABLES -P INPUT DROP
-$IPTABLES -P OUTPUT ACCEPT
+$IPTABLES -P OUTPUT DROP
 $IPTABLES -P FORWARD DROP
 
-$IPTABLES -N ACCEPT_FILTER 2>/dev/null
-$IPTABLES -A ACCEPT_FILTER -j ACCEPT
+$IPTABLES -N FIREWALL 2>/dev/null
 
 
 #----------------------------------------------------------#
 # Preprocess                                               #
 #----------------------------------------------------------#
 
+if [ $SECURE = true ]; then
+    $IPTABLES -A FIREWALL -j DROP
+else
+    $IPTABLES -A FIREWALL -j ACCEPT
+fi
+
 # ループバック(自身)のアクセスをすべて許可
-$IPTABLES -A INPUT -i lo -j ACCEPT_FILTER
-$IPTABLES -A OUTPUT -o lo -j ACCEPT_FILTER
-$IPTABLES -A FORWARD -i lo -j ACCEPT_FILTER
-$IPTABLES -A FORWARD -o lo -j ACCEPT_FILTER
+$IPTABLES -A INPUT -i lo -j FIREWALL
+$IPTABLES -A OUTPUT -o lo -j FIREWALL
+$IPTABLES -A FORWARD -i lo -j FIREWALL
+$IPTABLES -A FORWARD -o lo -j FIREWALL
 
 # 確立した接続を切断しない
-# 設定完了まで切断されてもよいなら除外
-$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
-$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j ACCEPT_FILTER
-$IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT_FILTER
+$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j FIREWALL
+$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j FIREWALL
+$IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j FIREWALL
 
 # 名前解決できるようにする
 for nameserver in ${NAMESERVERS[@]}; do
-    $IPTABLES -A INPUT -s $nameserver -p udp --dport 53 -j ACCEPT_FILTER
-    $IPTABLES -A OUTPUT -d $nameserver -p udp --sport 53 -j ACCEPT_FILTER
-    $IPTABLES -A FORWARD -s $nameserver -p udp --dport 53 -j ACCEPT_FILTER
-    $IPTABLES -A FORWARD -d $nameserver -p udp --sport 53 -j ACCEPT_FILTER
+    $IPTABLES -A INPUT -s $nameserver -p udp --dport 53 -j FIREWALL
+    $IPTABLES -A OUTPUT -d $nameserver -p udp --sport 53 -j FIREWALL
+    $IPTABLES -A FORWARD -s $nameserver -p udp --dport 53 -j FIREWALL
+    $IPTABLES -A FORWARD -d $nameserver -p udp --sport 53 -j FIREWALL
     echo "NAMESERVER:	$nameserver"
 done
 
 # NTPサーバと同期できるようにする
 for ntpserver in ${NTPSERVERS[@]}; do
-    $IPTABLES -A INPUT -s $ntpserver -p udp --dport 123 -j ACCEPT_FILTER
-    $IPTABLES -A OUTPUT -d $ntpserver -p udp --sport 123 -j ACCEPT_FILTER
-    $IPTABLES -A FORWARD -s $ntpserver -p udp --dport 123 -j ACCEPT_FILTER
-    $IPTABLES -A FORWARD -d $ntpserver -p udp --sport 123 -j ACCEPT_FILTER
+    $IPTABLES -A INPUT -s $ntpserver -p udp --dport 123 -j FIREWALL
+    $IPTABLES -A OUTPUT -d $ntpserver -p udp --sport 123 -j FIREWALL
+    $IPTABLES -A FORWARD -s $ntpserver -p udp --dport 123 -j FIREWALL
+    $IPTABLES -A FORWARD -d $ntpserver -p udp --sport 123 -j FIREWALL
     echo "NTPSERVER:	$ntpserver"
 done
 
@@ -183,61 +178,104 @@ done
 # CountryFilter                                            #
 #----------------------------------------------------------#
 
+CIDR_COUNT_LIST=()
+declare -A CIDR_TABLE
+for ((CIDR=32;0<CIDR;CIDR--))
+do
+    CIDR_COUNT=$(echo "2^(32-$CIDR)" | bc)
+    CIDR_COUNT_LIST=($CIDR_COUNT "${CIDR_COUNT_LIST[@]}")
+    CIDR_TABLE[$CIDR_COUNT]=$CIDR
+done
+
 BUILD_COUNTRY(){
-  if [ ! -s $CACHE_DIR$1 ] || [ ! $2 ] || [ ! $3 ];then return;fi
-  echo "LOAD:	$1"
-  for line in `cat $CACHE_DIR$1 | grep -E "\|($2|$3)\|ipv4\|"`
-  do
-    CODE=`echo $line | cut -d "|" -f 2`
-    ADDR=`echo $line | cut -d "|" -f 4`
-    TEMP=`echo $line | cut -d "|" -f 5`
-    CIDR=32
-    while [ $TEMP -ne 1 ]; do
-      TEMP=`expr "$TEMP" / 2`
-      CIDR=`expr "$CIDR" - 1`
+    if [ ! -s $CACHE_DIR$1 ] || [ ! $2 ] || [ ! $3 ];then return;fi
+    echo "LOAD:	$1"
+    local LINE
+    for LINE in `cat $CACHE_DIR$1 | grep -E "\|($2|$3)\|ipv4\|"`
+    do
+        local CODE=`echo $LINE | cut -d "|" -f 2`
+        local ADDR=`echo $LINE | cut -d "|" -f 4`
+        local COUNT=`echo $LINE | cut -d "|" -f 5`
+        local CIDR=32
+        if [ `echo $CODE | grep -E $2` ]; then
+            BUILD_COUNTRY_RULE $ADDR $COUNT BUILD_COUNTRY_RULE_ACCEPT
+            printf "%-10s%-4s%-20s%s\n" ACCEPT $CODE $ADDR/$? $LINE
+        elif [ `echo $CODE | grep -E $3` ]; then
+            BUILD_COUNTRY_RULE $ADDR $COUNT BUILD_COUNTRY_RULE_DROP
+            printf "%-10s%-4s%-20s%s\n" DROP   $CODE $ADDR/$? $LINE
+        fi
     done
-    if [ `echo $line | grep -E "\|($3)\|ipv4\|"` ]; then
-      $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j ACCEPT_FILTER
-      printf "%-10s%-4s%-20s%s\n" ACCEPT $CODE $ADDR/$CIDR $line
-    else
-      $IPTABLES -A DROP_FILTER -s $ADDR/$CIDR -j DROP
-      printf "%-10s%-4s%-20s%s\n" DROP   $CODE $ADDR/$CIDR $line
-    fi
-  done
+}
+BUILD_COUNTRY_RULE(){
+    local ADDR=$1
+    local COUNT=$2
+    local CALLBACK=$3
+    local CIDR_COUNT
+    for CIDR_COUNT in ${CIDR_COUNT_LIST[@]}
+    do
+        if [ $CIDR_COUNT -gt $COUNT ]; then continue;fi
+        local CIDR=${CIDR_TABLE[$CIDR_COUNT]}
+        eval "$CALLBACK $ADDR $CIDR"
+
+        if [ 0 -lt $(($COUNT-$CIDR_COUNT)) ]; then
+            ADDR=`SHIFT_ADDR $ADDR $CIDR_COUNT`
+            COUNT=$(($COUNT-$CIDR_COUNT))
+            BUILD_COUNTRY_RULE $ADDR $COUNT $CALLBACK
+        fi
+        return $CIDR
+    done
+}
+SHIFT_ADDR(){
+    local ADDR=$1
+    local COUNT=$2
+    local D1=$(($COUNT/(256**3)))
+    [ $D1 -ne 0 ] && COUNT=0
+    local D2=$(($COUNT/(256**2)))
+    [ $D2 -ne 0 ] && COUNT=0
+    local D3=$(($COUNT/(256**1)))
+    [ $D3 -ne 0 ] && COUNT=0
+    local D4=0
+    ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." 'NF == 4 { print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
+    echo $ADDR
+}
+BUILD_COUNTRY_RULE_ACCEPT(){
+    local ADDR=$1
+    local CIDR=$2
+    $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j FIREWALL
+}
+BUILD_COUNTRY_RULE_DROP(){
+    local ADDR=$1
+    local CIDR=$2
+    $IPTABLES -A BLACKLIST_COUNTRY -s $ADDR/$CIDR -j DROP
 }
 
-if [ $STRICT != true ]; then
-  if [ $RESET -ne 0 ] || [[ 3 > $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') ]] || [[ 3 > $($IPTABLES -nL DROP_FILTER 2>/dev/null | awk 'END{print NR}') ]]; then
+if [ $RESET -ne 0 ] || [ $ACCEPT_COUNTRY_CODE ] && [ $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
     echo "BUILD:		Chain COUNTRY_FILTER"
-    echo "BUILD:		Chain DROP_FILTER"
 
     $IPTABLES -F COUNTRY_FILTER 2>/dev/null
     $IPTABLES -X COUNTRY_FILTER 2>/dev/null
     $IPTABLES -N COUNTRY_FILTER 2>/dev/null
 
-    $IPTABLES -F DROP_FILTER 2>/dev/null
-    $IPTABLES -X DROP_FILTER 2>/dev/null
-    $IPTABLES -N DROP_FILTER 2>/dev/null
+    $IPTABLES -F BLACKLIST_COUNTRY 2>/dev/null
+    $IPTABLES -X BLACKLIST_COUNTRY 2>/dev/null
+    $IPTABLES -N BLACKLIST_COUNTRY 2>/dev/null
 
-    BUILD_COUNTRY "delegated-apnic-extended-latest"   $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-arin-extended-latest"    $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-ripencc-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-afrinic-extended-latest" $DROP_COUNTRY_CODE $ACCEPT_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-apnic-extended-latest"   $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-arin-extended-latest"    $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-ripencc-extended-latest" $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-afrinic-extended-latest" $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
 
     $IPTABLES -A COUNTRY_FILTER -j DROP
-  else
-    echo "REUSE:		Chain COUNTRY_FILTER"
-    echo "REUSE:		Chain DROP_FILTER"
-  fi
-
-  $IPTABLES -A INPUT -j DROP_FILTER
-  $IPTABLES -A OUTPUT -j DROP_FILTER
-  $IPTABLES -A FORWARD -j DROP_FILTER
 else
-  $IPTABLES -N COUNTRY_FILTER 2>/dev/null
-  $IPTABLES -N DROP_FILTER 2>/dev/null
-  $IPTABLES -A COUNTRY_FILTER -j ACCEPT_FILTER
+    [ $ACCEPT_COUNTRY_CODE ] && echo "REUSE:		Chain COUNTRY_FILTER"
+    [ $DROP_COUNTRY_CODE ] && echo "REUSE:		Chain BLACKLIST_COUNTRY"
+fi
+
+if [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -gt 2 ]; then
+    $IPTABLES -A INPUT -j BLACKLIST_COUNTRY
+    $IPTABLES -A FORWARD -j BLACKLIST_COUNTRY
+    $IPTABLES -A OUTPUT -j BLACKLIST_COUNTRY
 fi
 
 
@@ -287,6 +325,20 @@ sysctl -w net.ipv4.tcp_timestamps=1 > /dev/null
 sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.conf
 echo "net.ipv4.tcp_timestamps=1" >> /etc/sysctl.conf
 
+# ブロードキャストパケットをログを記録せずに破棄
+$IPTABLES -N DENY_BROADCAST
+$IPTABLES -A DENY_BROADCAST -j DROP
+$IPTABLES -N FW_BROADCAST
+$IPTABLES -A FW_BROADCAST -m pkttype --pkt-type broadcast -j DENY_BROADCAST
+$IPTABLES -A FIREWALL -j FW_BROADCAST && echo "FIREWALL:	DENY_BROADCAST		ALL"
+
+# マルチキャストパケットをログを記録せずに破棄
+$IPTABLES -N DENY_MULTICAST
+$IPTABLES -A DENY_MULTICAST -j DROP
+$IPTABLES -N FW_MULTICAST
+$IPTABLES -A FW_MULTICAST -m pkttype --pkt-type multicast -j DENY_MULTICAST
+$IPTABLES -A FIREWALL -j FW_MULTICAST && echo "FIREWALL:	DENY_MULTICAST		ALL"
+
 # 不正なアクセスを行ったIPからのすべてのアクセスをログを記録して破棄
 # ※調査的アクセスから公開ポートを隠蔽する
 # ※公表サーバーでは無効にしてよい
@@ -301,7 +353,7 @@ $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-fast --update --rttl -j ANTI_SPY
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-medium --update --rttl -j ANTI_SPY
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-slow --update --rttl -j ANTI_SPY
-$IPTABLES -A ACCEPT_FILTER -j FW_SPY && echo "FIREWALL:	ANTI_SPY		ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_SPY && echo "FIREWALL:	ANTI_SPY		ALL"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
@@ -379,15 +431,6 @@ $IPTABLES -A FW_PROWLER \
 $IPTABLES -A FW_PROWLER -m recent --name spy-slow --set
 $IPTABLES -A FW_PROWLER -j DROP
 
-# 全ホスト(ブロードキャストアドレス、マルチキャストアドレス)宛パケットをログを記録せずに破棄
-$IPTABLES -N DENY_BROADCAST
-$IPTABLES -A DENY_BROADCAST -j DROP
-$IPTABLES -N FW_BROADCAST
-$IPTABLES -A FW_BROADCAST -m pkttype --pkt-type broadcast -j DENY_BROADCAST
-$IPTABLES -A FW_BROADCAST -m pkttype --pkt-type multicast -j DENY_BROADCAST
-$IPTABLES -A INPUT -j FW_BROADCAST && echo "FIREWALL:	DENY_BROADCAST		INPUT"
-$IPTABLES -A FORWARD -j FW_BROADCAST && echo "FIREWALL:	DENY_BROADCAST		FORWARD"
-
 # 送信元IPアドレスがLANネットワーク範囲外のパケットをログを記録して破棄してNG
 # ※Ingress攻撃対策
 $IPTABLES -N ANTI_INGRESS
@@ -413,7 +456,7 @@ $IPTABLES -A FW_SPOOFING -i ppp+ -s 127.0.0.0/8    -j ANTI_SPOOFING
 $IPTABLES -A FW_SPOOFING -i ppp+ -s 10.0.0.0/8     -j ANTI_SPOOFING
 $IPTABLES -A FW_SPOOFING -i ppp+ -s 172.16.0.0/12  -j ANTI_SPOOFING
 $IPTABLES -A FW_SPOOFING -i ppp+ -s 192.168.0.0/16 -j ANTI_SPOOFING
-$IPTABLES -A ACCEPT_FILTER -j FW_SPOOFING && echo "FIREWALL:	ANTI_SPOOFING		ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL:	ANTI_SPOOFING		ALL"
 
 # 外部とのNetBIOS関連のアクセスはログを記録せずに破棄してNG
 $IPTABLES -N DENY_NETBIOS
@@ -428,7 +471,7 @@ $IPTABLES -A FW_NETBIOS -i ppp+ -p tcp -m multiport --dports 135,137,138,139,445
 $IPTABLES -A FW_NETBIOS -i ppp+ -p udp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS
 $IPTABLES -A FW_NETBIOS -o ppp+ -p tcp -m multiport --sports 135,137,138,139,445 -j DENY_NETBIOS
 $IPTABLES -A FW_NETBIOS -o ppp+ -p udp -m multiport --sports 135,137,138,139,445 -j DENY_NETBIOS
-$IPTABLES -A ACCEPT_FILTER -j FW_NETBIOS && echo "FIREWALL:	DENY_NETBIOS		ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_NETBIOS && echo "FIREWALL:	DENY_NETBIOS		ALL"
 
 # フラグメント化されたパケットをログを記録して破棄してNG
 $IPTABLES -N DENY_FRAGMENT
@@ -437,7 +480,7 @@ $IPTABLES -A DENY_FRAGMENT -j FW_PROWLER
 $IPTABLES -A DENY_FRAGMENT -j DROP
 $IPTABLES -N FW_FRAGMENT
 $IPTABLES -A FW_FRAGMENT -f -j DENY_FRAGMENT
-$IPTABLES -A ACCEPT_FILTER -j FW_FRAGMENT && echo "FIREWALL:	DENY_FRAGMENT		ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_FRAGMENT && echo "FIREWALL:	DENY_FRAGMENT		ALL"
 
 # 不正なパケットをログを記録して破棄してNG
 $IPTABLES -N DENY_INVALID
@@ -445,7 +488,7 @@ $IPTABLES -A DENY_INVALID -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_B
 $IPTABLES -A DENY_INVALID -j DROP
 $IPTABLES -N FW_INVALID
 $IPTABLES -A FW_INVALID -m state --state INVALID -j DENY_INVALID
-$IPTABLES -A ACCEPT_FILTER -j FW_INVALID && echo "FIREWALL:	DENY_INVALID		ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL:	DENY_INVALID		ALL"
 
 # フラグの不正なパケットを破棄、1時間に3回を超えたらログを記録してNG
 # ※ステルススキャン対策
@@ -496,7 +539,7 @@ $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL FIN,PSH,URG -j ANTI_STEALTHSC
 # XMAS
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j ANTI_STEALTHSCAN
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG,PSH -j ANTI_STEALTHSCAN
-$IPTABLES -A ACCEPT_FILTER -j FW_STEALTHSCAN && echo "FIREWALL:	ANTI_STEALTHSCAN	ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL:	ANTI_STEALTHSCAN	ALL"
 
 # pingは1秒間に4回を超えたらログを記録して破棄してNG
 # ※Ping of Death攻撃対策
@@ -515,7 +558,7 @@ $IPTABLES -A ANTI_PINGDEATH -j DROP
 $IPTABLES -N FW_PINGDEATH
 $IPTABLES -A FW_PINGDEATH -i eth+ -p icmp --icmp-type echo-request -j ANTI_PINGDEATH
 $IPTABLES -A FW_PINGDEATH -i ppp+ -p icmp --icmp-type echo-request -j ANTI_PINGDEATH
-$IPTABLES -A ACCEPT_FILTER -j FW_PINGDEATH && echo "FIREWALL:	ANTI_PINGDEATH		ACCEPT_FILTER"
+$IPTABLES -A FIREWALL -j FW_PINGDEATH && echo "FIREWALL:	ANTI_PINGDEATH		ALL"
 
 # 過大なアクセスをIP単位で制限
 # ※SYN Flood攻撃対策(数値は適宜調整)
@@ -542,7 +585,7 @@ $IPTABLES -A ANTI_SYNFLOOD -j DROP
 $IPTABLES -N FW_SYNFLOOD
 $IPTABLES -A FW_SYNFLOOD -i eth+ -p tcp --dport 80 -m state --state NEW -j ANTI_SYNFLOOD
 $IPTABLES -A FW_SYNFLOOD -i ppp+ -p tcp --dport 80 -m state --state NEW -j ANTI_SYNFLOOD
-$IPTABLES -A ACCEPT_FILTER -j FW_SYNFLOOD && echo "FIREWALL:	ANTI_SYNFLOOD		ACCEPT_FILTER[TCP:80]"
+$IPTABLES -A FIREWALL -j FW_SYNFLOOD && echo "FIREWALL:	ANTI_SYNFLOOD		ALL[TCP:80]"
 #
 # HTTPSポートへの過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_SYNFLOOD_SSL
@@ -559,7 +602,7 @@ $IPTABLES -A ANTI_SYNFLOOD_SSL -j DROP
 $IPTABLES -N FW_SYNFLOOD_SSL
 $IPTABLES -A FW_SYNFLOOD_SSL -i eth+ -p tcp --dport 443 -m state --state NEW -j ANTI_SYNFLOOD_SSL
 $IPTABLES -A FW_SYNFLOOD_SSL -i ppp+ -p tcp --dport 443 -m state --state NEW -j ANTI_SYNFLOOD_SSL
-$IPTABLES -A ACCEPT_FILTER -j FW_SYNFLOOD_SSL && echo "FIREWALL:	ANTI_SYNFLOOD_SSL	ACCEPT_FILTER[TCP:443]"
+$IPTABLES -A FIREWALL -j FW_SYNFLOOD_SSL && echo "FIREWALL:	ANTI_SYNFLOOD_SSL	ALL[TCP:443]"
 #
 # UDPによる過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_UDPFLOOD
@@ -576,7 +619,7 @@ $IPTABLES -A ANTI_UDPFLOOD -j DROP
 $IPTABLES -N FW_UDPFLOOD
 $IPTABLES -A FW_UDPFLOOD -i eth+ -p udp -m state --state NEW -j ANTI_UDPFLOOD
 $IPTABLES -A FW_UDPFLOOD -i ppp+ -p udp -m state --state NEW -j ANTI_UDPFLOOD
-$IPTABLES -A ACCEPT_FILTER -j FW_UDPFLOOD && echo "FIREWALL:	ANTI_UDPFLOOD		ACCEPT_FILTER[UDP]"
+$IPTABLES -A FIREWALL -j FW_UDPFLOOD && echo "FIREWALL:	ANTI_UDPFLOOD		ALL[UDP]"
 #
 # ICMPによる過大なアクセスをログを記録して破棄
 $IPTABLES -N ANTI_ICMPFLOOD
@@ -593,7 +636,7 @@ $IPTABLES -A ANTI_ICMPFLOOD -j DROP
 $IPTABLES -N FW_ICMPFLOOD
 $IPTABLES -A FW_ICMPFLOOD -i eth+ -p icmp --icmp-type echo-request -j ANTI_ICMPFLOOD
 $IPTABLES -A FW_ICMPFLOOD -i ppp+ -p icmp --icmp-type echo-request -j ANTI_ICMPFLOOD
-$IPTABLES -A ACCEPT_FILTER -j FW_ICMPFLOOD && echo "FIREWALL:	ANTI_ICMPFLOOD		ACCEPT_FILTER[ICMP]"
+$IPTABLES -A FIREWALL -j FW_ICMPFLOOD && echo "FIREWALL:	ANTI_ICMPFLOOD		ALL[ICMP]"
 
 # 管理用ポートへ3分間に10回を超えて接続試行をログを記録して破棄してNG
 # ※Brute Force攻撃対策
@@ -612,42 +655,52 @@ $IPTABLES -A ANTI_BRUTEFORCE -j DROP
 $IPTABLES -N FW_BRUTEFORCE
 $IPTABLES -A FW_BRUTEFORCE -i eth+ -p tcp -m multiport --dports $LOGIN -m state --syn --state NEW -j ANTI_BRUTEFORCE
 $IPTABLES -A FW_BRUTEFORCE -i ppp+ -p tcp -m multiport --dports $LOGIN -m state --syn --state NEW -j ANTI_BRUTEFORCE
-$IPTABLES -A ACCEPT_FILTER -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE		ACCEPT_FILTER[TCP]"
+$IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE		ALL[TCP]"
 
 
 #----------------------------------------------------------#
-# BLACKLIST/WHITELIST                                      #
+# BLACKLIST/GRAYLIST/WHITELIST                             #
 #----------------------------------------------------------#
 
 # ブラックリストに一致するIPをDROPする
+$IPTABLES -N BLACKLIST
 if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-  $IPTABLES -N BLACKLIST 2>/dev/null
   for line in `cat $BLACKLIST | grep ^[0-9]`
   do
     $IPTABLES -A BLACKLIST -s $line -j DROP
   done
 
-  $IPTABLES -A INPUT -j BLACKLIST
-  $IPTABLES -A FORWARD -j BLACKLIST
-  $IPTABLES -A OUTPUT -j BLACKLIST
+  $IPTABLES -I INPUT -j BLACKLIST
+  $IPTABLES -I FORWARD -j BLACKLIST
+  $IPTABLES -I OUTPUT -j BLACKLIST
 fi
 
-# ホワイトリストに一致しないIPをDROPする
+# グレーリストに一致するIPをFIREWALLへ転送する
+$IPTABLES -N GRAYLIST
+if [ $GRAYLIST ] && [ -s $GRAYLIST ]; then
+  for line in `cat $GRAYLIST | grep ^[0-9]`
+  do
+    $IPTABLES -A GRAYLIST -s $line -j FIREWALL
+  done
+
+  $IPTABLES -I INPUT -j GRAYLIST
+  $IPTABLES -I FORWARD -j GRAYLIST
+  $IPTABLES -I OUTPUT -j GRAYLIST
+fi
+
+# ホワイトリストに一致するIPをACCEPTする
+$IPTABLES -N WHITELIST
 if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-  $IPTABLES -N WHITELIST 2>/dev/null
   for line in `cat $WHITELIST | grep ^[0-9]`
   do
     $IPTABLES -A WHITELIST -s $line -j ACCEPT
   done
 
-  $IPTABLES -I BLACKLIST -g WHITELIST 2>/dev/null
-  $IPTABLES -I DROP_FILTER -g WHITELIST
-  if [ $STRICT = true ]; then
-    $IPTABLES -A WHITELIST -j DROP
-    $IPTABLES -A INPUT -j WHITELIST
-    $IPTABLES -A FORWARD -j WHITELIST
-    $IPTABLES -A OUTPUT -j WHITELIST
-  fi
+  $IPTABLES -I INPUT -j WHITELIST
+  $IPTABLES -I FORWARD -j WHITELIST
+  $IPTABLES -I OUTPUT -j WHITELIST
+
+  $IPTABLES -A WHITELIST -j DROP
 fi
 
 
@@ -655,35 +708,36 @@ fi
 # IDS/IPS                                                  #
 #----------------------------------------------------------#
 
-$IPTABLES -D ACCEPT_FILTER 1
-
 if [ $IPS = Snort ]; then
 
     # ICMPパケットをすべて解析
-    $IPTABLES -A ACCEPT_FILTER -p icmp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -p icmp -j NFQUEUE --queue-num 2
 
     # UDPパケットをすべて解析
-    $IPTABLES -A ACCEPT_FILTER -p udp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -p udp -j NFQUEUE --queue-num 2
 
     # TCPパケットを外部通信分のみ解析
-    $IPTABLES -A ACCEPT_FILTER -i eth+ -p tcp -j NFQUEUE --queue-num 2
-    $IPTABLES -A ACCEPT_FILTER -i ppp+ -p tcp -j NFQUEUE --queue-num 2
-    $IPTABLES -A ACCEPT_FILTER -o eth+ -p tcp -j NFQUEUE --queue-num 2
-    $IPTABLES -A ACCEPT_FILTER -o ppp+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -i eth+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -i ppp+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -o eth+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -o ppp+ -p tcp -j NFQUEUE --queue-num 2
 
     # バックエンドサーバーとの内部通信パケットを解析
-    $IPTABLES -A ACCEPT_FILTER -i lo -p tcp --dport 9000 -j NFQUEUE --queue-num 2
-    $IPTABLES -A ACCEPT_FILTER -o lo -p tcp --dport 9000 -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -i lo -p tcp --dport 9000 -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -o lo -p tcp --dport 9000 -j NFQUEUE --queue-num 2
 
     # 解析しないパケットはすべて許可
-    $IPTABLES -A ACCEPT_FILTER -j ACCEPT
+    $IPTABLES -A FIREWALL -j ACCEPT
 
     echo "IDS/IPS:	Snort"
 
 else
-    $IPTABLES -A ACCEPT_FILTER -j ACCEPT
+    $IPTABLES -A FIREWALL -j ACCEPT
     echo "IDS/IPS:	DISABLE"
 fi
+
+# 一時設定を除去
+$IPTABLES -D FIREWALL 1
 
 
 #----------------------------------------------------------#
@@ -709,10 +763,10 @@ $IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j COUNTRY_FILTER
 #$IPTABLES -A INPUT -p udp --dport 53 -j COUNTRY_FILTER && echo "OPEN:		DNS[UDP:53]"
 
 # HTTP[TCP:80]ポートを開放
-$IPTABLES -A INPUT -p tcp --dport 80 -j ACCEPT_FILTER && echo "OPEN:		HTTP[TCP:80]"
+$IPTABLES -A INPUT -p tcp --dport 80 -j FIREWALL && echo "OPEN:		HTTP			ALL[TCP:80]"
 
 # HTTPS[TCP:443]ポートを開放
-$IPTABLES -A INPUT -p tcp --dport 443 -j COUNTRY_FILTER && echo "OPEN:		HTTPS[TCP:443]"
+$IPTABLES -A INPUT -p tcp --dport 443 -j COUNTRY_FILTER && echo "OPEN:		HTTPS			ALL[TCP:443]"
 
 # FTP[TCP:21]ポートを開放
 #$IPTABLES -A INPUT -p tcp --dport 21 -j COUNTRY_FILTER
@@ -765,6 +819,8 @@ $IPTABLES -A TRAP_PORTSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_
 $IPTABLES -A TRAP_PORTSCAN -j FW_PROWLER
 $IPTABLES -A TRAP_PORTSCAN -j DROP
 $IPTABLES -N FW_PORTSCAN
+$IPTABLES -A FW_PORTSCAN -j FW_BROADCAST
+$IPTABLES -A FW_PORTSCAN -j FW_MULTICAST
 $IPTABLES -A FW_PORTSCAN -j TRAP_PORTSCAN
 $IPTABLES -A INPUT -j FW_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN		INPUT[TCP/UDP/ICMP]"
 $IPTABLES -A FORWARD -j FW_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN		FORWARD[TCP/UDP/ICMP]"

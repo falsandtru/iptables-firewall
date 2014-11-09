@@ -1,6 +1,6 @@
 # iptables firewall
 
-ルールを設定
+## 使用方法
 
 ```sh
 $ sudo mkdir /var/cache/iptables
@@ -12,12 +12,46 @@ kern.=debug /var/log/iptables.log
 $ sudo sh /etc/cron.daily/iptables
 ```
 
-BLACKLIST/WHITELIST
+## 設定
+
+### SECURE
+有効にした場合、設定完了まですべての接続を切断、拒否する。無効でも新規の接続はすべて拒否する。初期値では無効。
+
+```sh
+SECURE=true
+```
+
+## フィルタ
+
+### 優先度
+
+0. WHITELIST
+0. GRAYLIST
+0. BLACKLIST
+0. BLACKLIST_COUNTRY
+0. COUNTRY_FILTER
+0. FIREWALL(Firewall, IPS/IDS)
+
+### FIREWALL
+Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
+
+### COUNTRY_FILTER
+許可した国のIPからのパケットをFIREWALLへ送り、それ以外のパケットは破棄する。
+
+国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+
+### BLACKLIST_COUNTRY
+拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
+
+国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+
+### BLACKLIST
+一致するIPをDROPする。
+
+有害なIPを早期にフィルタすることでiptablesの負荷を軽減する。
 
 ```sh
 BLACKLIST=/etc/iptables/blacklist
-WHITELIST=/etc/iptables/whitelist
-STRICT=
 ```
 
 ```
@@ -25,20 +59,37 @@ STRICT=
 1.2.3.0/24
 ```
 
+### GRAYLIST
+一致するIPをFIREWALLへ転送する。
+
+DROP_FILTERとCOUTORY_FILTERによるフィルタを免除する。
+
+```sh
+GRAYLIST=/etc/iptables/graylist
+```
+
+```
+# GRAYLIST
+1.2.3.3
+```
+
+### WHITELIST
+一致するIPをACCEPTする。
+
+WHITELISTを設定した場合、WHITELISTに一致しないすべてのIPを遮断する。
+
+```sh
+WHITELIST=/etc/iptables/whitelist
+```
+
 ```
 # WHITELIST
 1.2.3.4
 ```
 
-STRICT
+## ipv6の無効化
+無効化しない場合、v6のインターフェイスはノーガードで晒される。
 
-```sh
-BLACKLIST=
-WHITELIST=/etc/iptables/whitelist
-STRICT=true
-```
-
-ipv6を無効化
 ```sh
 $ sudo vi /etc/sysctl.conf
 # ipv6 disable
@@ -59,7 +110,8 @@ $ netstat -an -A inet6
 $ lsmod | grep ipv6 # モジュール自体はロードさせる
 ```
 
-ログローテート
+## ログローテート
+
 ```sh
 $ sudo service rsyslog restart
 $ sudo vi /etc/logrotate.d/iptables
@@ -77,6 +129,15 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.2.0
+
+* OUTPUTチェーンのポリシーをDROPに変更
+* CIDRへの変換が不完全であるバグを修正(初期設定では影響なし)
+* IPリストの適用を高速化
+* グレーリスト機能を追加
+* SECUREモードを追加
+* STRICTモードを削除
 
 ### 0.1.5
 
