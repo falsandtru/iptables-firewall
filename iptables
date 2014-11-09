@@ -258,7 +258,7 @@ BUILD_COUNTRY_RULE_DROP(){
     $IPTABLES -A BLACKLIST_COUNTRY -s $ADDR/$CIDR -j DROP
 }
 
-if [ $RESET -ne 0 ] || [ $ACCEPT_COUNTRY_CODE ] && [ $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
+if [ $RESET -ne 0 ] || [ $ACCEPT_COUNTRY_CODE -a $($IPTABLES -nL COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ $DROP_COUNTRY_CODE -a $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
     echo "BUILD:		Chain COUNTRY_FILTER"
 
     $IPTABLES -F COUNTRY_FILTER 2>/dev/null
