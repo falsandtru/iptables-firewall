@@ -236,15 +236,8 @@ SHIFT_ADDR(){
     [ $D3 -ne 0 ] && COUNT=0
     local D4=$(($COUNT/(256**0)))
     ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." '{ print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
-    ADDR=(`echo " "$ADDR | tr -s '.' ' '`)
-    local I
-    for ((I=$((${#ADDR[@]}-1));0<=I;I--))
-    do
-        if [ ${ADDR[I]} -lt 256 ]; then continue;fi
-        ADDR[$I]=$((ADDR[$I]-256))
-        ADDR[$I-1]=$((ADDR[$I-1]+1))
-    done
-    ADDR="$(IFS='.'; echo "${ADDR[*]}")"
+    # IPの数値が255を超えた場合のIPの繰り上げ処理とこれに付随するサブネットマスクの分割処理を実装していないため当該処理が必要な場合は当該部分において正常に動作しない。
+    # レジストリの公開しているIP割り当てリストでは繰り上がり処理が必要となる項目は見受けられなかったためこれらの処理を省略する。
     echo $ADDR
 }
 BUILD_COUNTRY_RULE_ACCEPT(){
