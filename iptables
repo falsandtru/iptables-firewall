@@ -120,6 +120,7 @@ else
     done
 
     for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+        if [ FIREWALL = $CHAIN ]; then continue;fi
         if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
         $IPTABLES -X $CHAIN
