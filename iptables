@@ -182,7 +182,7 @@ CIDR_COUNT_LIST=()
 declare -A CIDR_TABLE
 for ((CIDR=32;0<CIDR;CIDR--))
 do
-    CIDR_COUNT=$(echo "2^(32-$CIDR)" | bc)
+    CIDR_COUNT=$((2**(32-$CIDR)))
     CIDR_COUNT_LIST=($CIDR_COUNT "${CIDR_COUNT_LIST[@]}")
     CIDR_TABLE[$CIDR_COUNT]=$CIDR
 done
