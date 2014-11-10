@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.2.1
+# @version 0.2.2
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -120,6 +120,7 @@ else
     done
 
     for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+        if [ FIREWALL = $CHAIN ]; then continue;fi
         if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
         $IPTABLES -X $CHAIN
@@ -182,7 +183,7 @@ CIDR_COUNT_LIST=()
 declare -A CIDR_TABLE
 for ((CIDR=32;0<CIDR;CIDR--))
 do
-    CIDR_COUNT=$(echo "2^(32-$CIDR)" | bc)
+    CIDR_COUNT=$((2**(32-$CIDR)))
     CIDR_COUNT_LIST=($CIDR_COUNT "${CIDR_COUNT_LIST[@]}")
     CIDR_TABLE[$CIDR_COUNT]=$CIDR
 done
@@ -236,15 +237,8 @@ SHIFT_ADDR(){
     [ $D3 -ne 0 ] && COUNT=0
     local D4=$(($COUNT/(256**0)))
     ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." '{ print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
-    ADDR=(`echo " "$ADDR | tr -s '.' ' '`)
-    local I
-    for ((I=$((${#ADDR[@]}-1));0<=I;I--))
-    do
-        if [ ${ADDR[I]} -le 255 ]; then continue;fi
-        ADDR[$I]=$((${ADDR[I]}-255))
-        ADDR[$I-1]=$((ADDR[$I-1]+1))
-    done
-    ADDR="$(IFS='.'; echo "${ADDR[*]}")"
+    # IPの数値が255を超えた場合のIPの繰り上げ処理とこれに付随するサブネットマスクの分割処理を実装していないため当該処理が必要な場合は当該部分において正常に動作しない。
+    # レジストリの公開しているIP割り当てリストでは繰り上がり処理が必要となる項目は見受けられなかったためこれらの処理を省略する。
     echo $ADDR
 }
 BUILD_COUNTRY_RULE_ACCEPT(){
