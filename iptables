@@ -240,8 +240,8 @@ SHIFT_ADDR(){
     local I
     for ((I=$((${#ADDR[@]}-1));0<=I;I--))
     do
-        if [ ${ADDR[I]} -le 255 ]; then continue;fi
-        ADDR[$I]=$((${ADDR[I]}-255))
+        if [ ${ADDR[I]} -lt 256 ]; then continue;fi
+        ADDR[$I]=$((ADDR[$I]-256))
         ADDR[$I-1]=$((ADDR[$I-1]+1))
     done
     ADDR="$(IFS='.'; echo "${ADDR[*]}")"
