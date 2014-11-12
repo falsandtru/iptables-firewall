@@ -15,7 +15,7 @@ $ sudo sh /etc/cron.daily/iptables
 ## 設定
 
 ### SECURE
-有効にした場合、設定完了まですべての接続を切断、拒否する。無効でも新規の接続はすべて拒否する。初期値では無効。
+有効にした場合、設定完了まですべての接続を切断、破棄する。無効でも新規の接続はすべて破棄する。初期値では無効。
 
 ```sh
 SECURE=true
@@ -129,6 +129,11 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.2.3
+
+* Firewallの適用を通信方向に基づいて最適化
+* Centos7のNIC名に対応
 
 ### 0.2.2
 
