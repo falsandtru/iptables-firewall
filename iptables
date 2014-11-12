@@ -689,42 +689,42 @@ $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE		INBOU
 # ブラックリストに一致するIPをDROPする
 $IPTABLES -N BLACKLIST
 if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-  for line in `cat $BLACKLIST | grep ^[0-9]`
-  do
-    $IPTABLES -A BLACKLIST -s $line -j DROP
-  done
+    for line in `cat $BLACKLIST | grep ^[0-9]`
+    do
+        $IPTABLES -A BLACKLIST -s $line -j DROP
+    done
 
-  $IPTABLES -I INPUT -j BLACKLIST
-  $IPTABLES -I FORWARD -j BLACKLIST
-  $IPTABLES -I OUTPUT -j BLACKLIST
+    $IPTABLES -I INPUT -j BLACKLIST
+    $IPTABLES -I FORWARD -j BLACKLIST
+    $IPTABLES -I OUTPUT -j BLACKLIST
 fi
 
 # グレーリストに一致するIPをFIREWALLへ転送する
 $IPTABLES -N GRAYLIST
 if [ $GRAYLIST ] && [ -s $GRAYLIST ]; then
-  for line in `cat $GRAYLIST | grep ^[0-9]`
-  do
-    $IPTABLES -A GRAYLIST -s $line -j FIREWALL
-  done
+    for line in `cat $GRAYLIST | grep ^[0-9]`
+    do
+        $IPTABLES -A GRAYLIST -s $line -j FIREWALL
+    done
 
-  $IPTABLES -I INPUT -j GRAYLIST
-  $IPTABLES -I FORWARD -j GRAYLIST
-  $IPTABLES -I OUTPUT -j GRAYLIST
+    $IPTABLES -I INPUT -j GRAYLIST
+    $IPTABLES -I FORWARD -j GRAYLIST
+    $IPTABLES -I OUTPUT -j GRAYLIST
 fi
 
 # ホワイトリストに一致するIPをACCEPTする
 $IPTABLES -N WHITELIST
 if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-  for line in `cat $WHITELIST | grep ^[0-9]`
-  do
-    $IPTABLES -A WHITELIST -s $line -j ACCEPT
-  done
+    for line in `cat $WHITELIST | grep ^[0-9]`
+    do
+        $IPTABLES -A WHITELIST -s $line -j ACCEPT
+    done
 
-  $IPTABLES -I INPUT -j WHITELIST
-  $IPTABLES -I FORWARD -j WHITELIST
-  $IPTABLES -I OUTPUT -j WHITELIST
+    $IPTABLES -I INPUT -j WHITELIST
+    $IPTABLES -I FORWARD -j WHITELIST
+    $IPTABLES -I OUTPUT -j WHITELIST
 
-  $IPTABLES -A WHITELIST -j DROP
+    $IPTABLES -A WHITELIST -j DROP
 fi
 
 
