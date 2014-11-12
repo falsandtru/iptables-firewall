@@ -157,21 +157,21 @@ $IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j FIREWALL
 $IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j FIREWALL
 
 # 名前解決できるようにする
-for nameserver in ${NAMESERVERS[@]}; do
-    $IPTABLES -A INPUT -s $nameserver -p udp --dport 53 -j FIREWALL
-    $IPTABLES -A OUTPUT -d $nameserver -p udp --sport 53 -j FIREWALL
-    $IPTABLES -A FORWARD -s $nameserver -p udp --dport 53 -j FIREWALL
-    $IPTABLES -A FORWARD -d $nameserver -p udp --sport 53 -j FIREWALL
-    echo "NAMESERVER:	$nameserver"
+for NAMESERVER in ${NAMESERVERS[@]}; do
+    $IPTABLES -A INPUT -s $NAMESERVER -p udp --dport 53 -j FIREWALL
+    $IPTABLES -A OUTPUT -d $NAMESERVER -p udp --sport 53 -j FIREWALL
+    $IPTABLES -A FORWARD -s $NAMESERVER -p udp --dport 53 -j FIREWALL
+    $IPTABLES -A FORWARD -d $NAMESERVER -p udp --sport 53 -j FIREWALL
+    echo "NAMESERVER:	$NAMESERVER"
 done
 
 # NTPサーバと同期できるようにする
-for ntpserver in ${NTPSERVERS[@]}; do
-    $IPTABLES -A INPUT -s $ntpserver -p udp --dport 123 -j FIREWALL
-    $IPTABLES -A OUTPUT -d $ntpserver -p udp --sport 123 -j FIREWALL
-    $IPTABLES -A FORWARD -s $ntpserver -p udp --dport 123 -j FIREWALL
-    $IPTABLES -A FORWARD -d $ntpserver -p udp --sport 123 -j FIREWALL
-    echo "NTPSERVER:	$ntpserver"
+for NTPSERVER in ${NTPSERVERS[@]}; do
+    $IPTABLES -A INPUT -s $NTPSERVER -p udp --dport 123 -j FIREWALL
+    $IPTABLES -A OUTPUT -d $NTPSERVER -p udp --sport 123 -j FIREWALL
+    $IPTABLES -A FORWARD -s $NTPSERVER -p udp --dport 123 -j FIREWALL
+    $IPTABLES -A FORWARD -d $NTPSERVER -p udp --sport 123 -j FIREWALL
+    echo "NTPSERVER:	$NTPSERVER"
 done
 
 
@@ -729,9 +729,9 @@ $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE		INBOU
 # ブラックリストに一致するIPをDROPする
 $IPTABLES -N BLACKLIST
 if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-    for line in `cat $BLACKLIST | grep ^[0-9]`
+    for LINE in `cat $BLACKLIST | grep ^[0-9]`
     do
-        $IPTABLES -A BLACKLIST -s $line -j DROP
+        $IPTABLES -A BLACKLIST -s $LINE -j DROP
     done
 
     $IPTABLES -I INPUT -j BLACKLIST
@@ -742,9 +742,9 @@ fi
 # グレーリストに一致するIPをFIREWALLへ転送する
 $IPTABLES -N GRAYLIST
 if [ $GRAYLIST ] && [ -s $GRAYLIST ]; then
-    for line in `cat $GRAYLIST | grep ^[0-9]`
+    for LINE in `cat $GRAYLIST | grep ^[0-9]`
     do
-        $IPTABLES -A GRAYLIST -s $line -j FIREWALL
+        $IPTABLES -A GRAYLIST -s $LINE -j FIREWALL
     done
 
     $IPTABLES -I INPUT -j GRAYLIST
@@ -755,9 +755,9 @@ fi
 # ホワイトリストに一致するIPをACCEPTする
 $IPTABLES -N WHITELIST
 if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-    for line in `cat $WHITELIST | grep ^[0-9]`
+    for LINE in `cat $WHITELIST | grep ^[0-9]`
     do
-        $IPTABLES -A WHITELIST -s $line -j ACCEPT
+        $IPTABLES -A WHITELIST -s $LINE -j ACCEPT
     done
 
     $IPTABLES -I INPUT -j WHITELIST
