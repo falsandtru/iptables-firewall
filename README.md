@@ -60,9 +60,9 @@ BLACKLIST=/etc/iptables/blacklist
 ```
 
 ### GRAYLIST
-一致するIPをFIREWALLへ転送する。
+一致するIPをブラックリスト形式のフィルタ対象から除外する。
 
-BLACKLIST_COUNTRYとCOUTORY_FILTERによるフィルタを免除する。
+BLACKLISTおよびBLACKLIST_COUNTRYによるフィルタから除外する。
 
 ```sh
 GRAYLIST=/etc/iptables/graylist
@@ -74,9 +74,9 @@ GRAYLIST=/etc/iptables/graylist
 ```
 
 ### WHITELIST
-一致するIPをACCEPTする。
+一致するIPをFIREWALLへ転送する。
 
-WHITELISTを設定した場合、WHITELISTに一致しないすべてのIPを遮断する。
+WHITELISTを設定した場合、WHITELISTに一致しないすべてのIPを遮断する。ポートなどIP以外によるアクセス制御は不能となる。
 
 ```sh
 WHITELIST=/etc/iptables/whitelist
@@ -130,10 +130,14 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.3.0
+
+* GRAYLISTの挙動を改善
+
 ### 0.2.3
 
 * Firewallの適用を通信方向に基づいて最適化
-* Centos7のNIC名に対応
+* CentOS7のNIC名に対応
 
 ### 0.2.2
 
