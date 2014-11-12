@@ -130,9 +130,9 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
-### 0.2.4
+### 0.3.0
 
-* GRAYLISTの動作を改善
+* GRAYLISTの挙動を改善
 
 ### 0.2.3
 
