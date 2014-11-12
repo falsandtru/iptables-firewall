@@ -130,6 +130,10 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.2.3
+
+* 最適化
+
 ### 0.2.2
 
 * CIDRへの変換時の繰り上がり対応を削除(不要な対応)

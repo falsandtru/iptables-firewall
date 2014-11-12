@@ -188,6 +188,38 @@ do
     CIDR_TABLE[$CIDR_COUNT]=$CIDR
 done
 
+COUNT_TO_CIDR(){
+    local COUNT=$1
+    local CIDR_COUNT
+    for CIDR_COUNT in ${CIDR_COUNT_LIST[@]}
+    do
+        if [ $CIDR_COUNT -gt $COUNT ]; then continue;fi
+        local CIDR=${CIDR_TABLE[$CIDR_COUNT]}
+        break
+    done
+    echo $CIDR
+}
+CIDR_TO_COUNT(){
+    local CIDR=$1
+    local COUNT=$((2**(32-$CIDR)))
+    echo $COUNT
+}
+SHIFT_ADDR(){
+    local ADDR=$1
+    local COUNT=$2
+    local D1=$(($COUNT/(256**3)))
+    [ $D1 -ne 0 ] && COUNT=0
+    local D2=$(($COUNT/(256**2)))
+    [ $D2 -ne 0 ] && COUNT=0
+    local D3=$(($COUNT/(256**1)))
+    [ $D3 -ne 0 ] && COUNT=0
+    local D4=$(($COUNT/(256**0)))
+    ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." '{ print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
+    # IPの数値が255を超えた場合のIPの繰り上げ処理とこれに付随するサブネットマスクの分割処理を実装していないため当該処理が必要な場合は当該部分において正常に動作しない。
+    # レジストリの公開しているIP割り当てリストでは繰り上がり処理が必要となる項目は見受けられなかったためこれらの処理を省略する。
+    echo $ADDR
+}
+
 BUILD_COUNTRY(){
     if [ ! -s $CACHE_DIR$1 ] || [ ! $2 ] || [ ! $3 ];then return;fi
     echo "LOAD:	$1"
@@ -211,35 +243,15 @@ BUILD_COUNTRY_RULE(){
     local ADDR=$1
     local COUNT=$2
     local CALLBACK=$3
-    local CIDR_COUNT
-    for CIDR_COUNT in ${CIDR_COUNT_LIST[@]}
-    do
-        if [ $CIDR_COUNT -gt $COUNT ]; then continue;fi
-        local CIDR=${CIDR_TABLE[$CIDR_COUNT]}
-        eval "$CALLBACK $ADDR $CIDR"
+    local CIDR=`COUNT_TO_CIDR $COUNT`
+    eval "$CALLBACK $ADDR $CIDR"
 
-        if [ 0 -lt $(($COUNT-$CIDR_COUNT)) ]; then
-            ADDR=`SHIFT_ADDR $ADDR $CIDR_COUNT`
-            COUNT=$(($COUNT-$CIDR_COUNT))
-            BUILD_COUNTRY_RULE $ADDR $COUNT $CALLBACK
-        fi
-        return $CIDR
-    done
-}
-SHIFT_ADDR(){
-    local ADDR=$1
-    local COUNT=$2
-    local D1=$(($COUNT/(256**3)))
-    [ $D1 -ne 0 ] && COUNT=0
-    local D2=$(($COUNT/(256**2)))
-    [ $D2 -ne 0 ] && COUNT=0
-    local D3=$(($COUNT/(256**1)))
-    [ $D3 -ne 0 ] && COUNT=0
-    local D4=$(($COUNT/(256**0)))
-    ADDR=`echo $ADDR | awk -v D1=$D1 -v D2=$D2 -v D3=$D3 -v D4=$D4 -F"." '{ print $1+D1 "." $2+D2 "." $3+D3 "." $4+D4 }'`
-    # IPの数値が255を超えた場合のIPの繰り上げ処理とこれに付随するサブネットマスクの分割処理を実装していないため当該処理が必要な場合は当該部分において正常に動作しない。
-    # レジストリの公開しているIP割り当てリストでは繰り上がり処理が必要となる項目は見受けられなかったためこれらの処理を省略する。
-    echo $ADDR
+    local REM=$(($COUNT-`CIDR_TO_COUNT $CIDR`))
+    if [ $REM -gt 0 ]; then
+        ADDR=`SHIFT_ADDR $ADDR $(CIDR_TO_COUNT $CIDR)`
+        BUILD_COUNTRY_RULE $ADDR $REM $CALLBACK
+    fi
+    return $CIDR
 }
 BUILD_COUNTRY_RULE_ACCEPT(){
     local ADDR=$1
