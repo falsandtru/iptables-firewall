@@ -132,7 +132,7 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ### 0.2.3
 
-* 最適化
+* Firewallの適用を通信方向に基づいて最適化
 
 ### 0.2.2
 
