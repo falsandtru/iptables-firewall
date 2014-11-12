@@ -873,6 +873,11 @@ $IPTABLES -A INPUT -p tcp --dport 443 -j COUNTRY_FILTER && echo "SERVICE:	HTTPS	
 # VPNインタフェース用ファイアウォール設定
 #[ -f /etc/openvpn/openvpn-startup ] && /etc/openvpn/openvpn-startup
 
+
+#----------------------------------------------------------#
+# Postprocess                                               #
+#----------------------------------------------------------#
+
 # 公開していないポートへのパケットをログを記録して破棄してNG
 # ※ポートスキャン対策
 # ※開けていないポートに1度でも触ったらアウト
