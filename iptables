@@ -808,67 +808,67 @@ $IPTABLES -D FIREWALL 1
 #----------------------------------------------------------#
 
 # 最小限のICMPのみ許可
-$IPTABLES -A INPUT -p icmp --icmp-type destination-unreachable -j COUNTRY_FILTER
-$IPTABLES -A INPUT -p icmp --icmp-type source-quench -j COUNTRY_FILTER
-$IPTABLES -A INPUT -p icmp --icmp-type redirect -j COUNTRY_FILTER
-$IPTABLES -A INPUT -p icmp --icmp-type time-exceeded -j COUNTRY_FILTER
-$IPTABLES -A INPUT -p icmp --icmp-type parameter-problem -j COUNTRY_FILTER
+$IPTABLES -A INPUT -p icmp --icmp-type destination-unreachable -j COUNTRY_FILTER && echo "SERVICE:	ICMP			INPUT[ICMP:DestinationUnreachable]"
+$IPTABLES -A INPUT -p icmp --icmp-type source-quench -j COUNTRY_FILTER && echo "SERVICE:	ICMP			INPUT[ICMP:SourceQuench]"
+$IPTABLES -A INPUT -p icmp --icmp-type redirect -j COUNTRY_FILTER && echo "SERVICE:	ICMP			INPUT[ICMP:Redirect]"
+$IPTABLES -A INPUT -p icmp --icmp-type time-exceeded -j COUNTRY_FILTER && echo "SERVICE:	ICMP			INPUT[ICMP:TimeExceeded]"
+$IPTABLES -A INPUT -p icmp --icmp-type parameter-problem -j COUNTRY_FILTER && echo "SERVICE:	ICMP			INPUT[ICMP:ParameterProblem]"
 
 # 管理用ポート(SSH等)を開放
-$IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j COUNTRY_FILTER
+$IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j COUNTRY_FILTER && echo "SERVICE:	ADMIN			INPUT[TCP:XXX]"
 
 # SNMP[UDP:160,161]ポートを開放
-#$IPTABLES -A INPUT -p udp --dport 160 -j COUNTRY_FILTER && echo "SERVICE:	SNMP			[UDP:160]"
-#$IPTABLES -A INPUT -p udp --dport 161 -j COUNTRY_FILTER && echo "SERVICE:	SNMP			[UDP:161]"
+#$IPTABLES -A INPUT -p udp --dport 160 -j COUNTRY_FILTER && echo "SERVICE:	SNMP			INPUT[UDP:160]"
+#$IPTABLES -A INPUT -p udp --dport 161 -j COUNTRY_FILTER && echo "SERVICE:	SNMP			INPUT[UDP:161]"
 
 # DNS[TCP/UDP:53]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 53 -j COUNTRY_FILTER && echo "SERVICE:	DNS			[TCP:53]"
-#$IPTABLES -A INPUT -p udp --dport 53 -j COUNTRY_FILTER && echo "SERVICE:	DNS			[UDP:53]"
+#$IPTABLES -A INPUT -p tcp --dport 53 -j COUNTRY_FILTER && echo "SERVICE:	DNS			INPUT[TCP:53]"
+#$IPTABLES -A INPUT -p udp --dport 53 -j COUNTRY_FILTER && echo "SERVICE:	DNS			INPUT[UDP:53]"
 
 # HTTP[TCP:80]ポートを開放
-$IPTABLES -A INPUT -p tcp --dport 80 -j FIREWALL && echo "SERVICE:	HTTP			[TCP:80]"
+$IPTABLES -A INPUT -p tcp --dport 80 -j FIREWALL && echo "SERVICE:	HTTP			INPUT[TCP:80]"
 
 # HTTPS[TCP:443]ポートを開放
-$IPTABLES -A INPUT -p tcp --dport 443 -j COUNTRY_FILTER && echo "SERVICE:	HTTPS			[TCP:443]"
+$IPTABLES -A INPUT -p tcp --dport 443 -j COUNTRY_FILTER && echo "SERVICE:	HTTPS			INPUT[TCP:443]"
 
 # FTP[TCP:21]ポートを開放
 #$IPTABLES -A INPUT -p tcp --dport 21 -j COUNTRY_FILTER
 
 # PASV(FTP-DATA)ポートを開放 ※PASV用ポート60000:60030は設定例
-#$IPTABLES -A INPUT -p tcp --dport 60000:60030 -j COUNTRY_FILTER && echo "SERVICE:	PASV			[TCP:60000-60030]"
+#$IPTABLES -A INPUT -p tcp --dport 60000:60030 -j COUNTRY_FILTER && echo "SERVICE:	PASV			INPUT[TCP:60000-60030]"
 
 # IDENT[TCP:113]ポートを開放
 # ※IDENTを使用せずメールサーバーを公開する場合はメールサーバ等のレスポンス低下防止のため拒否応答
-#$IPTABLES -A INPUT -p tcp --dport 113 -j COUNTRY_FILTER && echo "SERVICE:	IDENT			[TCP:113]"
-#$IPTABLES -A INPUT -p tcp --dport 113 -j REJECT --reject-with tcp-reset && echo "REJECT:	IDENT			[TCP:113]"
+#$IPTABLES -A INPUT -p tcp --dport 113 -j COUNTRY_FILTER && echo "SERVICE:	IDENT			INPUT[TCP:113]"
+#$IPTABLES -A INPUT -p tcp --dport 113 -j REJECT --reject-with tcp-reset && echo "REJECT:	IDENT			INPUT[TCP:113]"
 
 # SMTP[TCP:25]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 25 -j COUNTRY_FILTER && echo "SERVICE:	SMTP			[TCP:25]"
+#$IPTABLES -A INPUT -p tcp --dport 25 -j COUNTRY_FILTER && echo "SERVICE:	SMTP			INPUT[TCP:25]"
 
 # SMTPS[TCP:465]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 465 -j COUNTRY_FILTER && echo "SERVICE:	SMTPS			[TCP:465]"
+#$IPTABLES -A INPUT -p tcp --dport 465 -j COUNTRY_FILTER && echo "SERVICE:	SMTPS			INPUT[TCP:465]"
 
 # POP3[TCP:110]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 110 -j COUNTRY_FILTER && echo "SERVICE:	POP3			[TCP:110]"
+#$IPTABLES -A INPUT -p tcp --dport 110 -j COUNTRY_FILTER && echo "SERVICE:	POP3			INPUT[TCP:110]"
 
 # POP3S[TCP:995]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 995 -j COUNTRY_FILTER && echo "SERVICE:	POP3S			[TCP:995]"
+#$IPTABLES -A INPUT -p tcp --dport 995 -j COUNTRY_FILTER && echo "SERVICE:	POP3S			INPUT[TCP:995]"
 
 # IMAP[TCP:143]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 143 -j COUNTRY_FILTER && echo "SERVICE:	IMAP			[TCP:143]"
+#$IPTABLES -A INPUT -p tcp --dport 143 -j COUNTRY_FILTER && echo "SERVICE:	IMAP			INPUT[TCP:143]"
 
 # IMAPS[TCP:993]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 993 -j COUNTRY_FILTER && echo "SERVICE:	IMAPS			[TCP:993]"
+#$IPTABLES -A INPUT -p tcp --dport 993 -j COUNTRY_FILTER && echo "SERVICE:	IMAPS			INPUT[TCP:993]"
 
 # OpenVPN[UDP:1194]ポートを開放
-#$IPTABLES -A INPUT -p udp --dport 1194 -j COUNTRY_FILTER && echo "SERVICE:	OpenVPN			[UDP:1194]"
+#$IPTABLES -A INPUT -p udp --dport 1194 -j COUNTRY_FILTER && echo "SERVICE:	OpenVPN			INPUT[UDP:1194]"
 
 # IPsec[TCP/UDP:50,51]ポートを開放
-#$IPTABLES -A INPUT -p 50 -j COUNTRY_FILTER && echo "SERVICE:	IPsec			[TCP/UDP:50]"
-#$IPTABLES -A INPUT -p 51 -j COUNTRY_FILTER && echo "SERVICE:	IPsec			[TCP/UDP:51]"
+#$IPTABLES -A INPUT -p 50 -j COUNTRY_FILTER && echo "SERVICE:	IPsec			INPUT[TCP/UDP:50]"
+#$IPTABLES -A INPUT -p 51 -j COUNTRY_FILTER && echo "SERVICE:	IPsec			INPUT[TCP/UDP:51]"
 
 # Submission[TCP:587]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 587 -j COUNTRY_FILTER && echo "SERVICE:	Submission			[TCP:587]"
+#$IPTABLES -A INPUT -p tcp --dport 587 -j COUNTRY_FILTER && echo "SERVICE:	Submission			INPUT[TCP:587]"
 
 # VPNインタフェース用ファイアウォール設定
 #[ -f /etc/openvpn/openvpn-startup ] && /etc/openvpn/openvpn-startup
