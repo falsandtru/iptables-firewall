@@ -176,6 +176,45 @@ done
 
 
 #----------------------------------------------------------#
+# BLACKLIST/GRAYLIST/WHITELIST                             #
+#----------------------------------------------------------#
+
+$IPTABLES -N WHITELIST
+$IPTABLES -N GRAYLIST
+$IPTABLES -N BLACKLIST
+
+# ホワイトリストに一致するIPをFIREWALLへ転送する
+$IPTABLES -I GRAYLIST -j WHITELIST
+if [ $WHITELIST ] && [ -s $WHITELIST ]; then
+    for LINE in `cat $WHITELIST | grep ^[0-9]`
+    do
+        $IPTABLES -A WHITELIST -s $LINE -j FIREWALL
+    done
+    $IPTABLES -A WHITELIST -j DROP
+fi
+
+# グレーリストに一致するIPをブラックリスト形式のフィルタから除外する
+$IPTABLES -A INPUT -j GRAYLIST
+$IPTABLES -A FORWARD -j GRAYLIST
+$IPTABLES -A OUTPUT -j GRAYLIST
+if [ $GRAYLIST ] && [ -s $GRAYLIST ]; then
+    for LINE in `cat $GRAYLIST | grep ^[0-9]`
+    do
+        $IPTABLES -A GRAYLIST -s $LINE -j RETURN
+    done
+fi
+
+# ブラックリストに一致するIPをDROPする
+$IPTABLES -A GRAYLIST -j BLACKLIST
+if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
+    for LINE in `cat $BLACKLIST | grep ^[0-9]`
+    do
+        $IPTABLES -A BLACKLIST -s $LINE -j DROP
+    done
+fi
+
+
+#----------------------------------------------------------#
 # CountryFilter                                            #
 #----------------------------------------------------------#
 
@@ -288,9 +327,7 @@ else
 fi
 
 if [ $DROP_COUNTRY_CODE ] && [ $($IPTABLES -nL BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -gt 2 ]; then
-    $IPTABLES -A INPUT -j BLACKLIST_COUNTRY
-    $IPTABLES -A FORWARD -j BLACKLIST_COUNTRY
-    $IPTABLES -A OUTPUT -j BLACKLIST_COUNTRY
+    $IPTABLES -A GRAYLIST -j BLACKLIST_COUNTRY
 fi
 
 
@@ -720,52 +757,6 @@ $IPTABLES -A FW_BRUTEFORCE -o p+ -j RETURN
 $IPTABLES -A FW_BRUTEFORCE -o w+ -j RETURN
 $IPTABLES -A FW_BRUTEFORCE -p tcp -m multiport --dports $LOGIN -m state --syn --state NEW -j ANTI_BRUTEFORCE
 $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE		INBOUND[TCP]"
-
-
-#----------------------------------------------------------#
-# BLACKLIST/GRAYLIST/WHITELIST                             #
-#----------------------------------------------------------#
-
-# ブラックリストに一致するIPをDROPする
-$IPTABLES -N BLACKLIST
-if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-    for LINE in `cat $BLACKLIST | grep ^[0-9]`
-    do
-        $IPTABLES -A BLACKLIST -s $LINE -j DROP
-    done
-
-    $IPTABLES -I INPUT -j BLACKLIST
-    $IPTABLES -I FORWARD -j BLACKLIST
-    $IPTABLES -I OUTPUT -j BLACKLIST
-fi
-
-# グレーリストに一致するIPをFIREWALLへ転送する
-$IPTABLES -N GRAYLIST
-if [ $GRAYLIST ] && [ -s $GRAYLIST ]; then
-    for LINE in `cat $GRAYLIST | grep ^[0-9]`
-    do
-        $IPTABLES -A GRAYLIST -s $LINE -j FIREWALL
-    done
-
-    $IPTABLES -I INPUT -j GRAYLIST
-    $IPTABLES -I FORWARD -j GRAYLIST
-    $IPTABLES -I OUTPUT -j GRAYLIST
-fi
-
-# ホワイトリストに一致するIPをACCEPTする
-$IPTABLES -N WHITELIST
-if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-    for LINE in `cat $WHITELIST | grep ^[0-9]`
-    do
-        $IPTABLES -A WHITELIST -s $LINE -j ACCEPT
-    done
-
-    $IPTABLES -I INPUT -j WHITELIST
-    $IPTABLES -I FORWARD -j WHITELIST
-    $IPTABLES -I OUTPUT -j WHITELIST
-
-    $IPTABLES -A WHITELIST -j DROP
-fi
 
 
 #----------------------------------------------------------#
