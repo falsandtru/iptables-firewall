@@ -136,10 +136,14 @@ $IPTABLES -N OUTBOUND_RETURN
 $IPTABLES -A OUTBOUND_RETURN -o lo -j RETURN
 $IPTABLES -A OUTBOUND_RETURN -o eth+ -j RETURN
 $IPTABLES -A OUTBOUND_RETURN -o ppp+ -j RETURN
+$IPTABLES -A OUTBOUND_RETURN -o en+ -j RETURN
+$IPTABLES -A OUTBOUND_RETURN -o wl+ -j RETURN
 $IPTABLES -N INBOUND_RETURN
 $IPTABLES -A INBOUND_RETURN -i lo -j RETURN
 $IPTABLES -A INBOUND_RETURN -i eth+ -j RETURN
 $IPTABLES -A INBOUND_RETURN -i ppp+ -j RETURN
+$IPTABLES -A INBOUND_RETURN -i en+ -j RETURN
+$IPTABLES -A INBOUND_RETURN -i wl+ -j RETURN
 
 $IPTABLES -N FIREWALL 2>/dev/null
 
@@ -739,8 +743,12 @@ if [ $IPS = Snort ]; then
     # TCPパケットを外部通信分のみ解析
     $IPTABLES -A FIREWALL -i eth+ -p tcp -j NFQUEUE --queue-num 2
     $IPTABLES -A FIREWALL -i ppp+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -i en+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -i wl+ -p tcp -j NFQUEUE --queue-num 2
     $IPTABLES -A FIREWALL -o eth+ -p tcp -j NFQUEUE --queue-num 2
     $IPTABLES -A FIREWALL -o ppp+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -o en+ -p tcp -j NFQUEUE --queue-num 2
+    $IPTABLES -A FIREWALL -o wl+ -p tcp -j NFQUEUE --queue-num 2
 
     # バックエンドサーバーとの内部通信パケットを解析
     $IPTABLES -A FIREWALL -i lo -p tcp --dport 9000 -j NFQUEUE --queue-num 2

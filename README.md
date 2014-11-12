@@ -133,6 +133,7 @@ $ sudo vi /etc/logrotate.d/iptables
 ### 0.2.3
 
 * Firewallの適用を通信方向に基づいて最適化
+* Centos7のNIC名に対応
 
 ### 0.2.2
 
