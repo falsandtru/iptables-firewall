@@ -55,7 +55,7 @@ IDSまたはIPSを使用する場合に設定する。
 
 ```sh
 # TESTロールを作成
-ROLES="TEST"
+ROLES=(TEST)
 ```
 
 ### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC
@@ -66,7 +66,7 @@ ROLES="TEST"
 
 ```sh
 # TESTロールにルールを設定
-TEST="/etc/iptables/private COUNTRY_FILTER FIREWALL IPS ACCEPT"
+TEST=(/etc/iptables/private COUNTRY_FILTER FIREWALL IPS ACCEPT)
 # 1. /etc/iptables/privateに記載されたIPのみ通過させ、ほかは破棄する。
 # 2. COUNTRY_FILTERに一致したIPのみ通過させ、ほかは破棄する。
 # 3. FIREWALLを適用しパケットを検疫する。
@@ -170,6 +170,10 @@ $ vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.4.1
+
+* ロールとルールの定義方法を配列に変更
 
 ### 0.4.0
 
