@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.4.0
+# @version 0.4.1
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -36,15 +36,15 @@ BLACKLIST=
 WHITELIST=
 
 # ロール
-ROLES="LOCAL KEEP SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC"
-LOCAL="IPS ACCEPT"
-KEEP="FIREWALL IPS ACCEPT"
-SYSTEM="/etc/iptables/system COUNTRY_FILTER FIREWALL IPS ACCEPT"
-NETWORK="/etc/iptables/network FIREWALL IPS ACCEPT"
-AUTH="/etc/iptables/auth COUNTRY_FILTER FIREWALL IPS ACCEPT"
-PRIVATE="/etc/iptables/user COUNTRY_FILTER FIREWALL IPS ACCEPT"
-CUSTOMER="COUNTRY_FILTER FIREWALL IPS ACCEPT"
-PUBLIC="FIREWALL IPS ACCEPT"
+ROLES=(LOCAL KEEP SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC)
+LOCAL=(IPS ACCEPT)
+KEEP=(FIREWALL IPS ACCEPT)
+SYSTEM=(/etc/iptables/system COUNTRY_FILTER FIREWALL IPS ACCEPT)
+NETWORK=(/etc/iptables/network FIREWALL IPS ACCEPT)
+AUTH=(/etc/iptables/auth COUNTRY_FILTER FIREWALL IPS ACCEPT)
+PRIVATE=(/etc/iptables/user COUNTRY_FILTER FIREWALL IPS ACCEPT)
+CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
+PUBLIC=(FIREWALL IPS ACCEPT)
 
 # 事前処理/事後処理
 PREPROCESS=
@@ -159,20 +159,20 @@ echo "PREPROCESS:	$PREPROCESS"
 # ロールチェーン生成
 for ROLE in ${ROLES[@]}; do
     $IPTABLES -N $ROLE 2>/dev/null
-    RULES=${!ROLE}
-    RULES=${RULES// /$IFS}
+    eval RULES="\${${ROLE}[@]}"
     for RULE in ${RULES[@]}; do
         if [ `echo $RULE | grep -E ^[A-Z_]\+$` ]; then
             $IPTABLES -A $ROLE -j $RULE
         elif [ -r $RULE ] || [ $SECURE != false ]; then
-            $IPTABLES -N `echo $RULE | awk -F / '{print $NF}'` 2>/dev/null
-            $IPTABLES -F `echo $RULE | awk -F / '{print $NF}'`
+            CHAIN=`echo $RULE | awk -F / '{print "file_"$NF}'`
+            $IPTABLES -N $CHAIN 2>/dev/null
+            $IPTABLES -F $CHAIN
             for LINE in `cat $RULE | grep ^[0-9]`
             do
-                $IPTABLES -A `echo $RULE | awk -F / '{print $NF}'` -s $LINE -j RETURN
+                $IPTABLES -A $CHAIN -s $LINE -j RETURN
             done
-            $IPTABLES -A `echo $RULE | awk -F / '{print $NF}'` -j DROP
-            $IPTABLES -A $ROLE -j `echo $RULE | awk -F / '{print $NF}'`
+            $IPTABLES -A $CHAIN -j DROP
+            $IPTABLES -A $ROLE -j $CHAIN
         fi
     done
 done
