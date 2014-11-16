@@ -14,44 +14,76 @@ $ sudo sh /etc/cron.daily/iptables
 
 ## 設定
 
-### SECURE
-有効にした場合、設定完了まですべての接続を切断、破棄する。無効でも新規の接続はすべて破棄する。初期値では無効。
+### LOGIN
+SSHなどのログインポートを設定。複数設定可。
 
-```sh
-SECURE=true
-```
+### INTERVAL
+IPの更新間隔。
+
+### ACCEPT_COUNTRY_CODE
+許可した国以外のIPからのパケットを破棄する。
+
+国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+
+### DROP_COUNTRY_CODE
+拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
+
+国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+
+### SECURE
+国別IPフィルタの構築中このフィルタを使用するアクセスをすべて遮断するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
+
+### ROLE
+各サービスへのアクセスフィルタをロールにより管理する。
+
+### NAME SERVER
+自動設定。
+
+### NTP SERVER
+自動設定。
 
 ## チェーン
 
 ### 優先度
 
 0. WHITELIST
-0. GRAYLIST
 0. BLACKLIST
-0. BLACKLIST_COUNTRY
 0. COUNTRY_FILTER
 0. FIREWALL(Firewall, IPS/IDS)
 
-### FIREWALL
-Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
+### ROLE
+任意のロールを作成し任意のフィルタを設定する。フィルタはチェーンで指定およびファイルで生成する。
 
-### COUNTRY_FILTER
-許可した国のIPからのパケットをFIREWALLへ送り、それ以外のパケットは破棄する。
+```
+# /etc/iptables/systemlist
+1.2.3.0/24
+```
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+```
+# /etc/iptables/adminlist
+1.2.3.1
+```
 
-### BLACKLIST_COUNTRY
-拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
+http://www.tcpiputils.com/
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+#### ROLES
+任意のロールを作成する。ロール名はすべて大文字でなければならない。
 
-### BLACKLIST
+#### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLICK
+既定のロール。
+
+### BLACKLIST/WHITELIST
+BLACKLISTにより有害なIPを早期にフィルタすることでiptablesの負荷を軽減する。
+
+#### BLACKLIST
 一致するIPをDROPする。
 
-有害なIPを早期にフィルタすることでiptablesの負荷を軽減する。
+#### WHITELIST
+一致するIPをBLACKLISTから除外する。
 
 ```sh
 BLACKLIST=/etc/iptables/blacklist
+WHITELIST=/etc/iptables/whitelist
 ```
 
 ```
@@ -59,35 +91,15 @@ BLACKLIST=/etc/iptables/blacklist
 1.2.3.0/24
 ```
 
-### GRAYLIST
-一致するIPをブラックリスト形式のフィルタ対象から除外する。
-
-BLACKLISTおよびBLACKLIST_COUNTRYによるフィルタから除外する。
-
-```sh
-GRAYLIST=/etc/iptables/graylist
-```
-
-```
-# GRAYLIST
-1.2.3.3
-```
-
-### WHITELIST
-一致するIPをFIREWALLへ転送する。
-
-WHITELISTを設定した場合、WHITELISTに一致しないすべてのIPを遮断する。ポートなどIP以外によるアクセス制御は不能となる。
-
-```sh
-WHITELIST=/etc/iptables/whitelist
-```
-
 ```
 # WHITELIST
-1.2.3.4
+1.2.3.1
 ```
 
-## ipv6の無効化
+### FIREWALL
+Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
+
+## IPv6の無効化
 無効化しない場合、v6のインターフェイスはノーガードで晒される。
 
 ```sh
@@ -132,6 +144,8 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ### 0.4.0
 
+* 仕様を刷新
+* サービスへのフィルタ設定をロールレベルに変更
 * ログ記録の制限を緩和
 
 ### 0.3.0
