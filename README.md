@@ -154,6 +154,7 @@ $ sudo vi /etc/logrotate.d/iptables
 * サービスへのフィルタ設定をロールレベルに変更
 * PREPROCESS機能を追加
 * POSTPROCESS機能を追加
+* Ingress攻撃対策を削除
 * ログ記録の制限を緩和
 
 ### 0.3.0

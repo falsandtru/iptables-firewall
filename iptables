@@ -19,9 +19,6 @@ LOGIN=0
 # IP更新間隔(日)
 INTERVAL=7
 
-# インタフェース名定義
-LAN=eth0
-
 # IPSの使用
 IDSIPS=
 
@@ -87,13 +84,6 @@ if [ -z $IDSIPS ]; then
         IDSIPS=false
     fi
 fi
-
-# 内部ネットワークのネットマスク取得
-LOCALNET_MASK=`ifconfig $LAN|sed -e 's/^.*Mask:\([^ ]*\)$/\1/p' -e d`
-
-# 内部ネットワークアドレス取得
-LOCALNET_ADDR=`netstat -rn|grep $LAN|grep $LOCALNET_MASK|cut -f1 -d' '`
-LOCALNET=$LOCALNET_ADDR/$LOCALNET_MASK
 
 # IP設定
 NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
@@ -423,16 +413,6 @@ $IPTABLES -A FW_PROWLER \
           -j ANTI_PROWLER_SLOW
 $IPTABLES -A FW_PROWLER -m recent --name spy-slow --set
 $IPTABLES -A FW_PROWLER -j DROP
-
-# 送信元IPアドレスがLANネットワーク範囲外のパケットをログを記録して破棄してNG
-# ※Ingress攻撃対策
-$IPTABLES -N ANTI_INGRESS
-$IPTABLES -A ANTI_INGRESS -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INGRESS] : '
-$IPTABLES -A ANTI_INGRESS -j FW_PROWLER
-$IPTABLES -A ANTI_INGRESS -j DROP
-$IPTABLES -N FW_INGRESS
-$IPTABLES -A FW_INGRESS -i $LAN ! -s $LOCALNET -j ANTI_INGRESS
-$IPTABLES -A FORWARD -j FW_INGRESS && echo "FIREWALL:	ANTI_INGRESS"
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
 # ※IP spoofing攻撃対策
