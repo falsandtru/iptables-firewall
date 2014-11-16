@@ -1,24 +1,41 @@
 # iptables firewall
+高機能iptables設定スクリプト。
 
-## 使用方法
+IPリスト、Firewall、IDS(IPS)などを任意に組み合わせたマルチレイヤフィルタをロールとして生成し、サービスごとに最適なロールを適用可能にする。
+
+## Feature
+
+* ロールレベルパケットコントロール
+* マルチレイヤフィルタリング
+* ファイアーウォール
+* ポートスキャントラップ
+* 国別IPフィルタリング
+* プリプロセス/ポストプロセスコマンド実行
+* 地域レジストリIP割り当ての自動取得/更新/適用
+
+## Usage
 
 ```sh
-$ sudo mkdir /var/cache/iptables
-$ sudo touch /etc/cron.daily/iptables
-$ sudo chmod 700 /etc/cron.daily/iptables
-$ sudo vi /etc/cron.daily/iptables
-$ sudo vi /etc/rsyslog.conf
-kern.=debug /var/log/iptables.log
-$ sudo sh /etc/cron.daily/iptables
+$ mkdir /var/cache/iptables
+$ touch /etc/cron.daily/iptables
+$ chmod 700 /etc/cron.daily/iptables
+$ vi /etc/cron.daily/iptables
+> # Paste script.
+$ vi /etc/rsyslog.conf
+> kern.=debug /var/log/iptables.log
+$ sh /etc/cron.daily/iptables
 ```
 
-## 設定
+## Config
 
 ### LOGIN
 SSHなどのログインポートを設定。複数設定可。
 
 ### INTERVAL
-IPの更新間隔。
+地域レジストリから取得するIP割り当ての更新間隔。
+
+### IDSIPS
+IDSまたはIPSを使用する場合に設定する。
 
 ### ACCEPT_COUNTRY_CODE
 許可した国以外のIPからのパケットを破棄する。
@@ -33,8 +50,32 @@ IPの更新間隔。
 ### SECURE
 国別IPフィルタの構築中このフィルタを使用するアクセスをすべて遮断するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
 
-### ROLE
-各サービスへのアクセスフィルタをロールにより管理する。
+### ROLES
+任意のロールを作成する。ロール名は大文字とアンダースコアの組み合わせでなければならない。
+
+```sh
+# TESTロールを作成
+ROLES="TEST"
+```
+
+### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC
+既定のロールルール設定。任意のチェーンと組み合わせを設定できる。チェーンは左から順に適用されマルチレイヤフィルタとして機能する。
+
+ルールにファイルを指定した場合は記載されたIPのみを通過させるフィルタを生成し適用する。ファイルが存在しない場合はすべて通過する設定となる。
+外部で作成されたチェーンを使用する場合はプリプロセスでチェーンを作成する必要がある。
+
+```sh
+# TESTロールにルールを設定
+TEST="/etc/iptables/private COUNTRY_FILTER FIREWALL IPS ACCEPT"
+# 1. /etc/iptables/privateに記載されたIPのみ通過させ、ほかは破棄する。
+# 2. COUNTRY_FILTERに一致したIPのみ通過させ、ほかは破棄する。
+# 3. FIREWALLを適用しパケットを検疫する。
+# 4. 任意のパケットをIPSへ渡し処理を終える。
+# 5. 残りのパケットをすべて許可し処理を終える。
+
+# ロールを適用
+$IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
+```
 
 ### PREPROCESS
 事前に実行するコマンドを設定する。
@@ -48,43 +89,28 @@ IPの更新間隔。
 ### NTP SERVER
 自動設定。
 
-## チェーン
-
-### 優先度
-
-0. WHITELIST
-0. BLACKLIST
-0. COUNTRY_FILTER
-0. FIREWALL(Firewall, IPS/IDS)
+## Chain
 
 ### ROLE
-任意のロールを作成し任意のフィルタを設定する。フィルタはチェーンで指定およびファイルで生成する。
+任意のロールを作成し任意のフィルタを設定する。フィルタはチェーンで指定またはファイルで生成する。
 
 ```
-# /etc/iptables/systemlist
+# /etc/iptables/authlist
+# プロバイダなどで制限
+# http://www.tcpiputils.com/
 1.2.3.0/24
 ```
 
-```
-# /etc/iptables/adminlist
-1.2.3.1
-```
+### COUNTRY_FILTER
+ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
 
-http://www.tcpiputils.com/
+### FIREWALL
+不審なパケットを破棄し、そうでないパケットのみ通過させる。
 
-#### ROLES
-任意のロールを作成する。ロール名はすべて大文字でなければならない。
+### BLACKLIST
+一致するIPを破棄する。
 
-#### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLICK
-既定のロール。
-
-### BLACKLIST/WHITELIST
-BLACKLISTにより有害なIPを早期にフィルタすることでiptablesの負荷を軽減する。
-
-#### BLACKLIST
-一致するIPをDROPする。
-
-#### WHITELIST
+### WHITELIST
 一致するIPをBLACKLISTから除外する。
 
 ```sh
@@ -102,37 +128,34 @@ WHITELIST=/etc/iptables/whitelist
 1.2.3.1
 ```
 
-### FIREWALL
-Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
-
-## IPv6の無効化
-無効化しない場合、v6のインターフェイスはノーガードで晒される。
+## IPv6 disable
+無効化せず放置した場合、IPv6のインターフェイスが攻撃し放題となる。
 
 ```sh
-$ sudo vi /etc/sysctl.conf
+$ vi /etc/sysctl.conf
 # ipv6 disable
 net.ipv6.conf.all.disable_ipv6=1
 net.ipv6.conf.default.disable_ipv6=1
-$ sudo vi /etc/modprobe.d/disable-ipv6.conf
+$ vi /etc/modprobe.d/disable-ipv6.conf
 options ipv6 disable=1
-$ sudo vi /etc/hosts
+$ vi /etc/hosts
 #::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
-$ sudo chkconfig ip6tables off
+$ chkconfig ip6tables off
 
-$ sudo /sbin/sysctl -p
-$ sudo service network restart
-$ sudo reboot
+$ /sbin/sysctl -p
+$ service network restart
+$ reboot
 
 $ ifconfig
 $ netstat -an -A inet6
 $ lsmod | grep ipv6 # モジュール自体はロードさせる
 ```
 
-## ログローテート
+## Logrotate
 
 ```sh
-$ sudo service rsyslog restart
-$ sudo vi /etc/logrotate.d/iptables
+$ service rsyslog restart
+$ vi /etc/logrotate.d/iptables
 /var/log/iptables.log {
   rotate 14
   daily
