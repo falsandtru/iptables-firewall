@@ -49,6 +49,10 @@ PRIVATE="/etc/iptables/user COUNTRY_FILTER FIREWALL IPS ACCEPT"
 CUSTOMER="COUNTRY_FILTER FIREWALL IPS ACCEPT"
 PUBLIC="FIREWALL IPS ACCEPT"
 
+# 事前処理/事後処理
+PREPROCESS=
+POSTPROCESS=
+
 # ログの最大生成間隔
 LOG_LIMIT=60/m
 LOG_LIMIT_BURST=1000
@@ -158,14 +162,9 @@ $IPTABLES -N IDS
 # Preprocess                                               #
 #----------------------------------------------------------#
 
-# SECURE
-if [ $SECURE != false ]; then
-    $IPTABLES -I COUNTRY_FILTER -j DROP
-    $IPTABLES -I BLACKLIST_COUNTRY -j DROP
-else
-    $IPTABLES -I COUNTRY_FILTER -j ACCEPT
-    $IPTABLES -I BLACKLIST_COUNTRY -j ACCEPT
-fi
+# PREPROCESS
+echo "PREPROCESS:	$PREPROCESS"
+`$PREPROCESS`
 
 # ロールチェーン生成
 for ROLE in ${ROLES[@]}; do
@@ -187,6 +186,15 @@ for ROLE in ${ROLES[@]}; do
         fi
     done
 done
+
+# SECURE
+if [ $SECURE != false ]; then
+    $IPTABLES -I COUNTRY_FILTER -j DROP
+    $IPTABLES -I BLACKLIST_COUNTRY -j DROP
+else
+    $IPTABLES -I COUNTRY_FILTER -j ACCEPT
+    $IPTABLES -I BLACKLIST_COUNTRY -j ACCEPT
+fi
 
 # ループバック(自身)のアクセスをすべて許可
 $IPTABLES -A INPUT -i lo -j LOCAL
@@ -915,6 +923,10 @@ $IPTABLES -A FW_PORTSCAN -j FW_MULTICAST
 $IPTABLES -A FW_PORTSCAN -j TRAP_PORTSCAN
 $IPTABLES -A INPUT -j FW_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN"
 $IPTABLES -A FORWARD -j FW_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN"
+
+# POSTPROCESS
+echo "POSTPROCESS:	$POSTPROCESS"
+`$POSTPROCESS`
 
 
 #----------------------------------------------------------#

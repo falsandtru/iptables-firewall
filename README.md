@@ -36,6 +36,12 @@ IPの更新間隔。
 ### ROLE
 各サービスへのアクセスフィルタをロールにより管理する。
 
+### PREPROCESS
+事前に実行するコマンドを設定する。
+
+### POSTPROCESS
+事後に実行するコマンドを設定する。
+
 ### NAME SERVER
 自動設定。
 
@@ -146,6 +152,8 @@ $ sudo vi /etc/logrotate.d/iptables
 
 * 仕様を刷新
 * サービスへのフィルタ設定をロールレベルに変更
+* PREPROCESS機能を追加
+* POSTPROCESS機能を追加
 * ログ記録の制限を緩和
 
 ### 0.3.0
