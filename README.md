@@ -1,57 +1,121 @@
 # iptables firewall
+高機能iptables設定スクリプト。
 
-## 使用方法
+IPリスト、Firewall、IDS(IPS)などを任意に組み合わせたマルチレイヤフィルタをロールとして生成し、サービスごとに最適なロールを適用可能にする。
 
-```sh
-$ sudo mkdir /var/cache/iptables
-$ sudo touch /etc/cron.daily/iptables
-$ sudo chmod 700 /etc/cron.daily/iptables
-$ sudo vi /etc/cron.daily/iptables
-$ sudo vi /etc/rsyslog.conf
-kern.=debug /var/log/iptables.log
-$ sudo sh /etc/cron.daily/iptables
-```
+## Feature
 
-## 設定
+* ロールレベルパケットコントロール
+* マルチレイヤフィルタリング
+* ファイアーウォール
+* ポートスキャントラップ
+* 国別IPフィルタリング
+* プリプロセス/ポストプロセスコマンド実行
+* 地域レジストリIP割り当ての自動取得/更新/適用
 
-### SECURE
-有効にした場合、設定完了まですべての接続を切断、破棄する。無効でも新規の接続はすべて破棄する。初期値では無効。
+## Usage
 
 ```sh
-SECURE=true
+$ mkdir /var/cache/iptables
+$ touch /etc/cron.daily/iptables
+$ chmod 700 /etc/cron.daily/iptables
+$ vi /etc/cron.daily/iptables
+> # Paste script.
+$ vi /etc/rsyslog.conf
+> kern.=debug /var/log/iptables.log
+$ sh /etc/cron.daily/iptables
 ```
 
-## チェーン
+## Config
 
-### 優先度
+### LOGIN
+SSHなどのログインポートを設定。複数設定可。
 
-0. WHITELIST
-0. GRAYLIST
-0. BLACKLIST
-0. BLACKLIST_COUNTRY
-0. COUNTRY_FILTER
-0. FIREWALL(Firewall, IPS/IDS)
+### INTERVAL
+地域レジストリから取得するIP割り当ての更新間隔。
 
-### FIREWALL
-Firewall機能を持つ。設定によりIPS/IDSへ処理を引き渡す。
+### IDSIPS
+IDSまたはIPSを使用する場合に設定する。
 
-### COUNTRY_FILTER
-許可した国のIPからのパケットをFIREWALLへ送り、それ以外のパケットは破棄する。
+### ACCEPT_COUNTRY_CODE
+許可した国以外のIPからのパケットを破棄する。
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
 
-### BLACKLIST_COUNTRY
+### DROP_COUNTRY_CODE
 拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERを初期化して再構築させる必要がある。
+国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+
+### SECURE
+国別IPフィルタの構築中このフィルタを使用するアクセスをすべて遮断するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
+
+### ROLES
+任意のロールを作成する。ロール名は大文字とアンダースコアの組み合わせでなければならない。
+
+```sh
+# TESTロールを作成
+ROLES="TEST"
+```
+
+### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC
+既定のロールルール設定。任意のチェーンと組み合わせを設定できる。チェーンは左から順に適用されマルチレイヤフィルタとして機能する。
+
+ルールにファイルを指定した場合は記載されたIPのみを通過させるフィルタを生成し適用する。ファイルが存在しない場合はすべて通過する設定となる。
+外部で作成されたチェーンを使用する場合はプリプロセスでチェーンを作成する必要がある。
+
+```sh
+# TESTロールにルールを設定
+TEST="/etc/iptables/private COUNTRY_FILTER FIREWALL IPS ACCEPT"
+# 1. /etc/iptables/privateに記載されたIPのみ通過させ、ほかは破棄する。
+# 2. COUNTRY_FILTERに一致したIPのみ通過させ、ほかは破棄する。
+# 3. FIREWALLを適用しパケットを検疫する。
+# 4. 任意のパケットをIPSへ渡し処理を終える。
+# 5. 残りのパケットをすべて許可し処理を終える。
+
+# ロールを適用
+$IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
+```
+
+### PREPROCESS
+事前に実行するコマンドを設定する。
+
+### POSTPROCESS
+事後に実行するコマンドを設定する。
+
+### NAME SERVER
+自動設定。
+
+### NTP SERVER
+自動設定。
+
+## Chain
+
+### ROLE
+任意のロールを作成し任意のフィルタを設定する。フィルタはチェーンで指定またはファイルで生成する。
+
+```
+# /etc/iptables/authlist
+# プロバイダなどで制限
+# http://www.tcpiputils.com/
+1.2.3.0/24
+```
+
+### COUNTRY_FILTER
+ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
+
+### FIREWALL
+不審なパケットを破棄し、そうでないパケットのみ通過させる。
 
 ### BLACKLIST
-一致するIPをDROPする。
+一致するIPを破棄する。
 
-有害なIPを早期にフィルタすることでiptablesの負荷を軽減する。
+### WHITELIST
+一致するIPをBLACKLISTから除外する。
 
 ```sh
 BLACKLIST=/etc/iptables/blacklist
+WHITELIST=/etc/iptables/whitelist
 ```
 
 ```
@@ -59,62 +123,39 @@ BLACKLIST=/etc/iptables/blacklist
 1.2.3.0/24
 ```
 
-### GRAYLIST
-一致するIPをブラックリスト形式のフィルタ対象から除外する。
-
-BLACKLISTおよびBLACKLIST_COUNTRYによるフィルタから除外する。
-
-```sh
-GRAYLIST=/etc/iptables/graylist
-```
-
-```
-# GRAYLIST
-1.2.3.3
-```
-
-### WHITELIST
-一致するIPをFIREWALLへ転送する。
-
-WHITELISTを設定した場合、WHITELISTに一致しないすべてのIPを遮断する。ポートなどIP以外によるアクセス制御は不能となる。
-
-```sh
-WHITELIST=/etc/iptables/whitelist
-```
-
 ```
 # WHITELIST
-1.2.3.4
+1.2.3.1
 ```
 
-## ipv6の無効化
-無効化しない場合、v6のインターフェイスはノーガードで晒される。
+## IPv6 disable
+無効化せず放置した場合、IPv6のインターフェイスが攻撃し放題となる。
 
 ```sh
-$ sudo vi /etc/sysctl.conf
+$ vi /etc/sysctl.conf
 # ipv6 disable
 net.ipv6.conf.all.disable_ipv6=1
 net.ipv6.conf.default.disable_ipv6=1
-$ sudo vi /etc/modprobe.d/disable-ipv6.conf
+$ vi /etc/modprobe.d/disable-ipv6.conf
 options ipv6 disable=1
-$ sudo vi /etc/hosts
+$ vi /etc/hosts
 #::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
-$ sudo chkconfig ip6tables off
+$ chkconfig ip6tables off
 
-$ sudo /sbin/sysctl -p
-$ sudo service network restart
-$ sudo reboot
+$ /sbin/sysctl -p
+$ service network restart
+$ reboot
 
 $ ifconfig
 $ netstat -an -A inet6
 $ lsmod | grep ipv6 # モジュール自体はロードさせる
 ```
 
-## ログローテート
+## Logrotate
 
 ```sh
-$ sudo service rsyslog restart
-$ sudo vi /etc/logrotate.d/iptables
+$ service rsyslog restart
+$ vi /etc/logrotate.d/iptables
 /var/log/iptables.log {
   rotate 14
   daily
@@ -129,6 +170,15 @@ $ sudo vi /etc/logrotate.d/iptables
 ```
 
 ## ChangeLog
+
+### 0.4.0
+
+* 仕様を刷新
+* サービスへのフィルタ設定をロールレベルに変更
+* PREPROCESS機能を追加
+* POSTPROCESS機能を追加
+* Ingress攻撃対策を削除
+* ログ記録の制限を緩和
 
 ### 0.3.0
 
