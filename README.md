@@ -130,6 +130,10 @@ $ sudo vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.4.0
+
+* ログ記録の制限を緩和
+
 ### 0.3.0
 
 * GRAYLISTの挙動を改善
