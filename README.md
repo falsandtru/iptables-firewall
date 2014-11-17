@@ -190,6 +190,10 @@ MIT License
 
 ## ChangeLog
 
+### 0.5.1
+
+* IP追跡処理を改善
+
 ### 0.5.0
 
 * Firewallをモジュールごとに利用できるよう改善

@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.5.0
+# @version 0.5.1
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -353,35 +353,11 @@ $IPTABLES -A TRACK_PROWLER -o lo -j RETURN
 $IPTABLES -A TRACK_PROWLER -o e+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o p+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o w+ -j RETURN
-$IPTABLES -A TRACK_PROWLER \
-          -m recent --name prowler-fast --update --rttl \
-          -m hashlimit \
-          --hashlimit-name prowler-fast \
-          --hashlimit 6/m \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 10000 \
-          --hashlimit-htable-max 10000 \
-          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --update --rttl --seconds 10 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --set
-$IPTABLES -A TRACK_PROWLER \
-          -m recent --name prowler-medium --update --rttl \
-          -m hashlimit \
-          --hashlimit-name prowler-medium \
-          --hashlimit 1/m \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 60000 \
-          --hashlimit-htable-max 10000 \
-          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --update --rttl --seconds 60 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --set
-$IPTABLES -A TRACK_PROWLER \
-          -m recent --name prowler-slow --update --rttl \
-          -m hashlimit \
-          --hashlimit-name prowler-slow \
-          --hashlimit 1/h \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 3600000 \
-          --hashlimit-htable-max 10000 \
-          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --update --rttl --seconds 3600 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --set
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
