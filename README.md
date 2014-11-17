@@ -66,12 +66,13 @@ ROLES=(TEST)
 
 ```sh
 # TESTロールにルールを設定
-TEST=(/etc/iptables/private COUNTRY_FILTER FIREWALL IPS ACCEPT)
+TEST=(/etc/iptables/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
 # 1. /etc/iptables/privateに記載されたIPのみ通過させ、ほかは破棄する。
 # 2. COUNTRY_FILTERに一致したIPのみ通過させ、ほかは破棄する。
 # 3. FIREWALLを適用しパケットを検疫する。
-# 4. 任意のパケットをIPSへ渡し処理を終える。
-# 5. 残りのパケットをすべて許可し処理を終える。
+# 4. 不審なIPを破棄する。
+# 5. 任意のパケットをIPSへ渡し処理を終える。
+# 6. 残りのパケットをすべて許可し処理を終える。
 
 # ロールを適用
 $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
@@ -176,7 +177,8 @@ $ vi /etc/logrotate.d/iptables
 * Firewallをモジュールごとに利用できるよう改善
 * ロールの設定を変更
 * FW_BASICフィルタを追加
-* FW_SPYをFIREWALLフィルタから除外
+* FW_SPYをFW_INTRUDERに変更
+* FW_INTRUDERをFIREWALLフィルタから除外
 
 ### 0.4.1
 

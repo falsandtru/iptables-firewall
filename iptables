@@ -39,10 +39,10 @@ WHITELIST=
 ROLES=(LOCAL KEEP SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC)
 LOCAL=(IPS ACCEPT)
 KEEP=(FIREWALL IPS ACCEPT)
-SYSTEM=(/etc/iptables/system FIREWALL FW_SPY IPS ACCEPT)
-NETWORK=(/etc/iptables/network FIREWALL FW_SPY IPS ACCEPT)
-AUTH=(/etc/iptables/auth COUNTRY_FILTER FIREWALL FW_SPY IPS ACCEPT)
-PRIVATE=(/etc/iptables/user COUNTRY_FILTER FIREWALL FW_SPY IPS ACCEPT)
+SYSTEM=(/etc/iptables/system FIREWALL FW_INTRUDER IPS ACCEPT)
+NETWORK=(/etc/iptables/network FIREWALL FW_INTRUDER IPS ACCEPT)
+AUTH=(/etc/iptables/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+PRIVATE=(/etc/iptables/user COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
 CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
 
@@ -317,23 +317,23 @@ $IPTABLES -A FW_BASIC -j FW_MULTICAST
 # 不正なアクセスを行ったIPからのすべてのアクセスをログを記録して破棄
 # ※調査的アクセスから公開ポートを隠蔽する
 # ※公表サーバーでは無効にしてよい
-$IPTABLES -N ANTI_SPY
-$IPTABLES -A ANTI_SPY -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPY] : '
-$IPTABLES -A ANTI_SPY -j DROP
-$IPTABLES -N FW_SPY 2>/dev/null
-$IPTABLES -A FW_SPY -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_SPY -i lo -j RETURN
-$IPTABLES -A FW_SPY -o lo -j RETURN
-$IPTABLES -A FW_SPY -o e+ -j RETURN
-$IPTABLES -A FW_SPY -o p+ -j RETURN
-$IPTABLES -A FW_SPY -o w+ -j RETURN
+$IPTABLES -N ANTI_INTRUDER
+$IPTABLES -A ANTI_INTRUDER -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
+$IPTABLES -A ANTI_INTRUDER -j DROP
+$IPTABLES -N FW_INTRUDER 2>/dev/null
+$IPTABLES -A FW_INTRUDER -m state --state ESTABLISHED,RELATED -j RETURN
+$IPTABLES -A FW_INTRUDER -i lo -j RETURN
+$IPTABLES -A FW_INTRUDER -o lo -j RETURN
+$IPTABLES -A FW_INTRUDER -o e+ -j RETURN
+$IPTABLES -A FW_INTRUDER -o p+ -j RETURN
+$IPTABLES -A FW_INTRUDER -o w+ -j RETURN
 # 公表サーバーでは既知のポートはフィルタしない
-$IPTABLES -A FW_SPY -p tcp --dport 0:1023 -j RETURN
-$IPTABLES -A FW_SPY -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-rapid --update --rttl -j ANTI_SPY
-$IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-fast --update --rttl -j ANTI_SPY
-$IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-medium --update --rttl -j ANTI_SPY
-$IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-slow --update --rttl -j ANTI_SPY
+$IPTABLES -A FW_INTRUDER -p tcp --dport 0:1023 -j RETURN
+$IPTABLES -A FW_INTRUDER -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-rapid --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-fast --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-medium --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-slow --update --rttl -j ANTI_INTRUDER
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
@@ -476,7 +476,7 @@ $IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL:	DENY_INVALID"
 # ※ステルススキャン対策
 # ※既知のポートはもともと隠密性がないため保護せず誤作動の回避を優先
 # ※SSHの終了処理をしないで切断されると簡単に自爆するので注意
-# ※FW_PORTSCANとFW_SPYが機能しているうちは有効にする必要性は低い
+# ※FW_PORTSCANとFW_INTRUDERが機能しているうちは有効にする必要性は低い
 # ※フラグパターンの妥当性未検証
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_STEALTHSCAN
