@@ -171,6 +171,10 @@ $ vi /etc/logrotate.d/iptables
 
 ## ChangeLog
 
+### 0.4.2
+
+* Firewallをモジュールごとに利用できるよう改善
+
 ### 0.4.1
 
 * ロールとルールの定義方法を配列に変更
