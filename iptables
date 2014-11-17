@@ -334,7 +334,6 @@ $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-fast --update --rttl -j ANTI_SPY
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-medium --update --rttl -j ANTI_SPY
 $IPTABLES -A FW_SPY -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-slow --update --rttl -j ANTI_SPY
-$IPTABLES -A FIREWALL -j FW_SPY && echo "FIREWALL:	ANTI_SPY"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効

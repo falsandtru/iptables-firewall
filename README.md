@@ -175,6 +175,7 @@ $ vi /etc/logrotate.d/iptables
 
 * Firewallをモジュールごとに利用できるよう改善
 * FW_BASICフィルタを追加
+* FW_SPYをFIREWALLフィルタから除外
 
 ### 0.4.1
 
