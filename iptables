@@ -128,7 +128,6 @@ else
     done
 
     for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
-        if [ FIREWALL = $CHAIN ]; then continue;fi
         if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
         $IPTABLES -X $CHAIN
@@ -144,6 +143,7 @@ $IPTABLES -N COUNTRY_FILTER 2>/dev/null
 $IPTABLES -N BLACKLIST_COUNTRY 2>/dev/null
 
 $IPTABLES -N FIREWALL
+$IPTABLES -N FW_BASIC
 $IPTABLES -N IPS
 $IPTABLES -N IDS
 
@@ -300,6 +300,7 @@ $IPTABLES -A FW_BROADCAST -o p+ -j RETURN
 $IPTABLES -A FW_BROADCAST -o w+ -j RETURN
 $IPTABLES -A FW_BROADCAST -m pkttype --pkt-type broadcast -j DENY_BROADCAST
 $IPTABLES -A FIREWALL -j FW_BROADCAST && echo "FIREWALL:	DENY_BROADCAST"
+$IPTABLES -A FW_BASIC -j FW_BROADCAST
 
 # マルチキャストパケットをログを記録せずに破棄
 $IPTABLES -N DENY_MULTICAST
@@ -311,6 +312,7 @@ $IPTABLES -A FW_MULTICAST -o p+ -j RETURN
 $IPTABLES -A FW_MULTICAST -o w+ -j RETURN
 $IPTABLES -A FW_MULTICAST -m pkttype --pkt-type multicast -j DENY_MULTICAST
 $IPTABLES -A FIREWALL -j FW_MULTICAST && echo "FIREWALL:	DENY_MULTICAST"
+$IPTABLES -A FW_BASIC -j FW_MULTICAST
 
 # 不正なアクセスを行ったIPからのすべてのアクセスをログを記録して破棄
 # ※調査的アクセスから公開ポートを隠蔽する
@@ -432,6 +434,7 @@ $IPTABLES -A FW_SPOOFING -s 10.0.0.0/8     -j ANTI_SPOOFING
 $IPTABLES -A FW_SPOOFING -s 172.16.0.0/12  -j ANTI_SPOOFING
 $IPTABLES -A FW_SPOOFING -s 192.168.0.0/16 -j ANTI_SPOOFING
 $IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL:	ANTI_SPOOFING"
+$IPTABLES -A FW_BASIC -j FW_SPOOFING
 
 # 外部とのNetBIOS関連のアクセスはログを記録せずに破棄してNG
 $IPTABLES -N DENY_NETBIOS
@@ -441,6 +444,7 @@ $IPTABLES -N FW_NETBIOS 2>/dev/null
 $IPTABLES -A FW_NETBIOS -p tcp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS
 $IPTABLES -A FW_NETBIOS -p udp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS
 $IPTABLES -A FIREWALL -j FW_NETBIOS && echo "FIREWALL:	DENY_NETBIOS"
+$IPTABLES -A FW_BASIC -j FW_NETBIOS
 
 # フラグメント化されたパケットをログを記録して破棄してNG
 $IPTABLES -N DENY_FRAGMENT
@@ -661,6 +665,7 @@ $IPTABLES -A FW_BRUTEFORCE -o p+ -j RETURN
 $IPTABLES -A FW_BRUTEFORCE -o w+ -j RETURN
 $IPTABLES -A FW_BRUTEFORCE -p tcp -m multiport --dports $LOGIN -m state --syn --state NEW -j ANTI_BRUTEFORCE
 $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL:	ANTI_BRUTEFORCE"
+$IPTABLES -A FW_BASIC -j FW_BRUTEFORCE
 
 
 #----------------------------------------------------------#
