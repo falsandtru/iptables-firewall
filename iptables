@@ -360,13 +360,13 @@ $IPTABLES -A ANTI_PROWLER_MEDIUM -m recent --name spy-medium --set -j DROP
 $IPTABLES -N ANTI_PROWLER_SLOW
 $IPTABLES -A ANTI_PROWLER_SLOW -m recent --name spy-slow --update --rttl -j DROP
 $IPTABLES -A ANTI_PROWLER_SLOW -m recent --name spy-slow --set -j DROP
-$IPTABLES -N FW_PROWLER 2>/dev/null
-$IPTABLES -A FW_PROWLER -i lo -j RETURN
-$IPTABLES -A FW_PROWLER -o lo -j RETURN
-$IPTABLES -A FW_PROWLER -o e+ -j RETURN
-$IPTABLES -A FW_PROWLER -o p+ -j RETURN
-$IPTABLES -A FW_PROWLER -o w+ -j RETURN
-$IPTABLES -A FW_PROWLER \
+$IPTABLES -N TRACK_PROWLER 2>/dev/null
+$IPTABLES -A TRACK_PROWLER -i lo -j RETURN
+$IPTABLES -A TRACK_PROWLER -o lo -j RETURN
+$IPTABLES -A TRACK_PROWLER -o e+ -j RETURN
+$IPTABLES -A TRACK_PROWLER -o p+ -j RETURN
+$IPTABLES -A TRACK_PROWLER -o w+ -j RETURN
+$IPTABLES -A TRACK_PROWLER \
           -m hashlimit \
           --hashlimit-name prowler-limit \
           --hashlimit-above 1/s \
@@ -374,11 +374,11 @@ $IPTABLES -A FW_PROWLER \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 800 \
           -j DROP
-$IPTABLES -N FW_PROWLER_LIMIT
-$IPTABLES -A FW_PROWLER_LIMIT -m limit --limit 1000/s --limit-burst 10000 -j RETURN
-$IPTABLES -A FW_PROWLER_LIMIT -j DROP
-$IPTABLES -A FW_PROWLER -j FW_PROWLER_LIMIT
-$IPTABLES -A FW_PROWLER \
+$IPTABLES -N TRACK_PROWLER_LIMIT
+$IPTABLES -A TRACK_PROWLER_LIMIT -m limit --limit 1000/s --limit-burst 10000 -j RETURN
+$IPTABLES -A TRACK_PROWLER_LIMIT -j DROP
+$IPTABLES -A TRACK_PROWLER -j TRACK_PROWLER_LIMIT
+$IPTABLES -A TRACK_PROWLER \
           -m hashlimit \
           --hashlimit-name prowler-rapid \
           --hashlimit-above 1/s \
@@ -386,8 +386,8 @@ $IPTABLES -A FW_PROWLER \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 1000 \
           -j ANTI_PROWLER_RAPID
-$IPTABLES -A FW_PROWLER -m recent --name spy-rapid --set
-$IPTABLES -A FW_PROWLER \
+$IPTABLES -A TRACK_PROWLER -m recent --name spy-rapid --set
+$IPTABLES -A TRACK_PROWLER \
           -m hashlimit \
           --hashlimit-name prowler-fast \
           --hashlimit-above 1/h \
@@ -395,8 +395,8 @@ $IPTABLES -A FW_PROWLER \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 100000 \
           -j ANTI_PROWLER_FAST
-$IPTABLES -A FW_PROWLER -m recent --name spy-fast --set
-$IPTABLES -A FW_PROWLER \
+$IPTABLES -A TRACK_PROWLER -m recent --name spy-fast --set
+$IPTABLES -A TRACK_PROWLER \
           -m hashlimit \
           --hashlimit-name prowler-medium \
           --hashlimit-above 1/h \
@@ -404,8 +404,8 @@ $IPTABLES -A FW_PROWLER \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 1000000 \
           -j ANTI_PROWLER_MEDIUM
-$IPTABLES -A FW_PROWLER -m recent --name spy-medium --set
-$IPTABLES -A FW_PROWLER \
+$IPTABLES -A TRACK_PROWLER -m recent --name spy-medium --set
+$IPTABLES -A TRACK_PROWLER \
           -m hashlimit \
           --hashlimit-name prowler-slow \
           --hashlimit-above 1/d \
@@ -413,14 +413,14 @@ $IPTABLES -A FW_PROWLER \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 10000000 \
           -j ANTI_PROWLER_SLOW
-$IPTABLES -A FW_PROWLER -m recent --name spy-slow --set
-$IPTABLES -A FW_PROWLER -j DROP
+$IPTABLES -A TRACK_PROWLER -m recent --name spy-slow --set
+$IPTABLES -A TRACK_PROWLER -j DROP
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
 # ※IP spoofing攻撃対策
 $IPTABLES -N ANTI_SPOOFING
 $IPTABLES -A ANTI_SPOOFING -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPOOFING] : '
-$IPTABLES -A ANTI_SPOOFING -j FW_PROWLER
+$IPTABLES -A ANTI_SPOOFING -j TRACK_PROWLER
 $IPTABLES -A ANTI_SPOOFING -j DROP
 $IPTABLES -N FW_SPOOFING 2>/dev/null
 $IPTABLES -A FW_SPOOFING -i lo -j RETURN
@@ -437,7 +437,7 @@ $IPTABLES -A FW_BASIC -j FW_SPOOFING
 
 # 外部とのNetBIOS関連のアクセスはログを記録せずに破棄してNG
 $IPTABLES -N DENY_NETBIOS
-$IPTABLES -A DENY_NETBIOS -j FW_PROWLER
+$IPTABLES -A DENY_NETBIOS -j TRACK_PROWLER
 $IPTABLES -A DENY_NETBIOS -j DROP
 $IPTABLES -N FW_NETBIOS 2>/dev/null
 $IPTABLES -A FW_NETBIOS -p tcp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS
@@ -448,7 +448,7 @@ $IPTABLES -A FW_BASIC -j FW_NETBIOS
 # フラグメント化されたパケットをログを記録して破棄してNG
 $IPTABLES -N DENY_FRAGMENT
 $IPTABLES -A DENY_FRAGMENT -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES FRAGMENT] : '
-$IPTABLES -A DENY_FRAGMENT -j FW_PROWLER
+$IPTABLES -A DENY_FRAGMENT -j TRACK_PROWLER
 $IPTABLES -A DENY_FRAGMENT -j DROP
 $IPTABLES -N FW_FRAGMENT 2>/dev/null
 $IPTABLES -A FW_FRAGMENT -i lo -j RETURN
@@ -489,7 +489,7 @@ $IPTABLES -A ANTI_STEALTHSCAN \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 960000 \
           -j DROP
-$IPTABLES -A ANTI_STEALTHSCAN -j FW_PROWLER
+$IPTABLES -A ANTI_STEALTHSCAN -j TRACK_PROWLER
 $IPTABLES -A ANTI_STEALTHSCAN -j DROP
 $IPTABLES -N FW_STEALTHSCAN 2>/dev/null
 $IPTABLES -A FW_STEALTHSCAN -i lo -j RETURN
@@ -537,7 +537,7 @@ $IPTABLES -A ANTI_PINGDEATH \
           --hashlimit-htable-expire 1000 \
           -j RETURN
 $IPTABLES -A ANTI_PINGDEATH -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PINGDEATH] : '
-$IPTABLES -A ANTI_PINGDEATH -j FW_PROWLER
+$IPTABLES -A ANTI_PINGDEATH -j TRACK_PROWLER
 $IPTABLES -A ANTI_PINGDEATH -j DROP
 $IPTABLES -N FW_PINGDEATH 2>/dev/null
 $IPTABLES -A FW_PINGDEATH -i lo -j RETURN
@@ -654,7 +654,7 @@ $IPTABLES -A ANTI_BRUTEFORCE \
           --hashlimit-htable-expire 180000 \
           -j RETURN
 $IPTABLES -A ANTI_BRUTEFORCE -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES BRUTEFORCE] : '
-$IPTABLES -A ANTI_BRUTEFORCE -j FW_PROWLER
+$IPTABLES -A ANTI_BRUTEFORCE -j TRACK_PROWLER
 $IPTABLES -A ANTI_BRUTEFORCE -j DROP
 $IPTABLES -N FW_BRUTEFORCE 2>/dev/null
 $IPTABLES -A FW_BRUTEFORCE -i lo -j RETURN
@@ -895,7 +895,7 @@ $IPTABLES -D BLACKLIST_COUNTRY 1 2>/dev/null
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N TRAP_PORTSCAN
 $IPTABLES -A TRAP_PORTSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-$IPTABLES -A TRAP_PORTSCAN -j FW_PROWLER
+$IPTABLES -A TRAP_PORTSCAN -j TRACK_PROWLER
 $IPTABLES -A TRAP_PORTSCAN -j DROP
 $IPTABLES -N FW_PORTSCAN
 $IPTABLES -A FW_PORTSCAN -i lo -j RETURN
