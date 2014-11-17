@@ -783,67 +783,67 @@ fi
 #----------------------------------------------------------#
 
 # 最小限のICMPのみ許可
-$IPTABLES -A INPUT -p icmp --icmp-type destination-unreachable -j SYSTEM && echo "ICMP:		SYSTEM			INPUT[ICMP:DestinationUnreachable]"
-$IPTABLES -A INPUT -p icmp --icmp-type source-quench -j SYSTEM && echo "ICMP:		SYSTEM			INPUT[ICMP:SourceQuench]"
-$IPTABLES -A INPUT -p icmp --icmp-type redirect -j SYSTEM && echo "ICMP:		SYSTEM			INPUT[ICMP:Redirect]"
-$IPTABLES -A INPUT -p icmp --icmp-type time-exceeded -j SYSTEM && echo "ICMP:		SYSTEM			INPUT[ICMP:TimeExceeded]"
-$IPTABLES -A INPUT -p icmp --icmp-type parameter-problem -j SYSTEM && echo "ICMP:		SYSTEM			INPUT[ICMP:ParameterProblem]"
+$IPTABLES -A INPUT -p icmp --icmp-type destination-unreachable -j SYSTEM && echo "SERVICE:	ICMP[SYSTEM]		INPUT[ICMP:DestinationUnreachable]"
+$IPTABLES -A INPUT -p icmp --icmp-type source-quench -j SYSTEM && echo "SERVICE:	ICMP[SYSTEM]		INPUT[ICMP:SourceQuench]"
+$IPTABLES -A INPUT -p icmp --icmp-type redirect -j SYSTEM && echo "SERVICE:	ICMP[SYSTEM]		INPUT[ICMP:Redirect]"
+$IPTABLES -A INPUT -p icmp --icmp-type time-exceeded -j SYSTEM && echo "SERVICE:	ICMP[SYSTEM]		INPUT[ICMP:TimeExceeded]"
+$IPTABLES -A INPUT -p icmp --icmp-type parameter-problem -j SYSTEM && echo "SERVICE:	ICMP[SYSTEM]		INPUT[ICMP:ParameterProblem]"
 
 # DNS[TCP/UDP:53]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 53 -j SYSTEM && echo "DNS:		SYSTEM			INPUT[TCP:53]"
-#$IPTABLES -A INPUT -p udp --dport 53 -j SYSTEM && echo "DNS:		SYSTEM			INPUT[UDP:53]"
+#$IPTABLES -A INPUT -p tcp --dport 53 -j SYSTEM && echo "SERVICE:	DNS[SYSTEM]		INPUT[TCP:53]"
+#$IPTABLES -A INPUT -p udp --dport 53 -j SYSTEM && echo "SERVICE:	DNS[SYSTEM]		INPUT[UDP:53]"
 
 # 管理用ポート(SSH等)を開放
-$IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j AUTH && echo "AUTH:		AUTH			INPUT[TCP:XXX]"
+$IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j AUTH && echo "SERVICE:	SSH[AUTH]		INPUT[TCP:XXX]"
 
 # SNMP[UDP:160,161]ポートを開放AUTH
-#$IPTABLES -A INPUT -p udp --dport 160 -j SYSTEM && echo "SNMP:		SYSTEM			INPUT[UDP:160]"
-#$IPTABLES -A INPUT -p udp --dport 161 -j SYSTEM && echo "SNMP:		SYSTEM			INPUT[UDP:161]"
+#$IPTABLES -A INPUT -p udp --dport 160 -j SYSTEM && echo "SERVICE:	SNMP[SYSTEM]		INPUT[UDP:160]"
+#$IPTABLES -A INPUT -p udp --dport 161 -j SYSTEM && echo "SERVICE:	SNMP[SYSTEM]		INPUT[UDP:161]"
 
 # HTTP[TCP:80]ポートを開放
-$IPTABLES -A INPUT -p tcp --dport 80 -j PUBLIC && echo "HTTP:		PUBLIC			INPUT[TCP:80]"
+$IPTABLES -A INPUT -p tcp --dport 80 -j PUBLIC && echo "SERVICE:	HTTP[PUBLIC]		INPUT[TCP:80]"
 
 # HTTPS[TCP:443]ポートを開放
-$IPTABLES -A INPUT -p tcp --dport 443 -j CUSTOMER && echo "HTTPS:		CUSTOMER		INPUT[TCP:443]"
+$IPTABLES -A INPUT -p tcp --dport 443 -j CUSTOMER && echo "SERVICE:	HTTPS[CUSTOMER]		INPUT[TCP:443]"
 
 # FTP[TCP:21]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 21 -j PRIVATE && echo "FTP:		PRIVATE			INPUT[TCP:21]"
+#$IPTABLES -A INPUT -p tcp --dport 21 -j PRIVATE && echo "SERVICE:	FTP[PRIVATE]		INPUT[TCP:21]"
 
 # PASV(FTP-DATA)ポートを開放 ※PASV用ポート60000:60030は設定例
-#$IPTABLES -A INPUT -p tcp --dport 60000:60030 -j PRIVATE && echo "PASV:		PRIVATE			INPUT[TCP:60000-60030]"
+#$IPTABLES -A INPUT -p tcp --dport 60000:60030 -j PRIVATE && echo "SERVICE:	PASV[PRIVATE]		INPUT[TCP:60000-60030]"
 
 # IDENT[TCP:113]ポートを開放
 # ※IDENTを使用せずメールサーバーを公開する場合はメールサーバ等のレスポンス低下防止のため拒否応答
-#$IPTABLES -A INPUT -p tcp --dport 113 -j PRIVATE && echo "IDENT:		PRIVATE			INPUT[TCP:113]"
-#$IPTABLES -A INPUT -p tcp --dport 113 -j REJECT --reject-with tcp-reset && echo "IDENT:		REJECT			INPUT[TCP:113]"
+#$IPTABLES -A INPUT -p tcp --dport 113 -j PRIVATE && echo "SERVICE:	IDENT[PRIVATE]		INPUT[TCP:113]"
+#$IPTABLES -A INPUT -p tcp --dport 113 -j REJECT --reject-with tcp-reset && echo "SERVICE:	IDENT[REJECT]		INPUT[TCP:113]"
 
 # SMTP[TCP:25]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 25 -j PRIVATE && echo "SMTP:		PRIVATE			INPUT[TCP:25]"
+#$IPTABLES -A INPUT -p tcp --dport 25 -j PRIVATE && echo "SERVICE:	SMTP[PRIVATE]		INPUT[TCP:25]"
 
 # SMTPS[TCP:465]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 465 -j AUTH && echo "SMTPS:		AUTH			INPUT[TCP:465]"
+#$IPTABLES -A INPUT -p tcp --dport 465 -j AUTH && echo "SERVICE:	SMTPS[AUTH]		INPUT[TCP:465]"
 
 # POP3[TCP:110]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 110 -j PRIVATE && echo "POP3:		PRIVATE			INPUT[TCP:110]"
+#$IPTABLES -A INPUT -p tcp --dport 110 -j PRIVATE && echo "SERVICE:	POP3[PRIVATE]		INPUT[TCP:110]"
 
 # POP3S[TCP:995]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 995 -j AUTH && echo "POP3S:		AUTH			INPUT[TCP:995]"
+#$IPTABLES -A INPUT -p tcp --dport 995 -j AUTH && echo "SERVICE:	POP3S[AUTH]		INPUT[TCP:995]"
 
 # IMAP[TCP:143]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 143 -j PRIVATE && echo "IMAP:		PRIVATE			INPUT[TCP:143]"
+#$IPTABLES -A INPUT -p tcp --dport 143 -j PRIVATE && echo "SERVICE:	IMAP[PRIVATE]		INPUT[TCP:143]"
 
 # IMAPS[TCP:993]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 993 -j AUTH && echo "IMAPS:		AUTH			INPUT[TCP:993]"
+#$IPTABLES -A INPUT -p tcp --dport 993 -j AUTH && echo "SERVICE:	IMAPS[AUTH]		INPUT[TCP:993]"
 
 # OpenVPN[UDP:1194]ポートを開放
-#$IPTABLES -A INPUT -p udp --dport 1194 -j AUTH && echo "OpenVPN:		AUTH			INPUT[UDP:1194]"
+#$IPTABLES -A INPUT -p udp --dport 1194 -j AUTH && echo "SERVICE:	OpenVPN[AUTH]		INPUT[UDP:1194]"
 
 # IPsec[TCP/UDP:50,51]ポートを開放
-#$IPTABLES -A INPUT -p 50 -j AUTH && echo "IPsec:		AUTH			INPUT[TCP/UDP:50]"
-#$IPTABLES -A INPUT -p 51 -j AUTH && echo "IPsec:		AUTH			INPUT[TCP/UDP:51]"
+#$IPTABLES -A INPUT -p 50 -j AUTH && echo "SERVICE:	IPsec[AUTH]		INPUT[TCP/UDP:50]"
+#$IPTABLES -A INPUT -p 51 -j AUTH && echo "SERVICE:	IPsec[AUTH]		INPUT[TCP/UDP:51]"
 
 # Submission[TCP:587]ポートを開放
-#$IPTABLES -A INPUT -p tcp --dport 587 -j PRIVATE && echo "Submission:		PRIVATE			INPUT[TCP:587]"
+#$IPTABLES -A INPUT -p tcp --dport 587 -j PRIVATE && echo "SERVICE:	Submission[PRIVATE]	INPUT[TCP:587]"
 
 # VPNインタフェース用ファイアウォール設定
 #[ -f /etc/openvpn/openvpn-startup ] && /etc/openvpn/openvpn-startup
