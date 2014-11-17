@@ -62,7 +62,7 @@ CACHE_DIR=/var/cache/iptables/
 
 
 #----------------------------------------------------------#
-# AutoConfig                                               #
+# Configure                                                #
 #----------------------------------------------------------#
 
 echo "iptables firewall"
@@ -84,10 +84,6 @@ if [ -z $IDSIPS ]; then
         IDSIPS=false
     fi
 fi
-
-# IP設定
-NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
-NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}'))
 
 
 #----------------------------------------------------------#
@@ -201,6 +197,7 @@ $IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j KEEP
 $IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j KEEP
 
 # 名前解決できるようにする
+NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
 for NAMESERVER in ${NAMESERVERS[@]}; do
     $IPTABLES -A INPUT -s $NAMESERVER -p udp --dport 53 -j SYSTEM
     $IPTABLES -A OUTPUT -d $NAMESERVER -p udp --sport 53 -j SYSTEM
@@ -210,6 +207,7 @@ for NAMESERVER in ${NAMESERVERS[@]}; do
 done
 
 # NTPサーバと同期できるようにする
+NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}'))
 for NTPSERVER in ${NTPSERVERS[@]}; do
     $IPTABLES -A INPUT -s $NTPSERVER -p udp --dport 123 -j SYSTEM
     $IPTABLES -A OUTPUT -d $NTPSERVER -p udp --sport 123 -j SYSTEM
