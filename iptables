@@ -480,6 +480,7 @@ $IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL:	DENY_INVALID"
 # ※フラグパターンの妥当性未検証
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
 $IPTABLES -A ANTI_STEALTHSCAN \
           -m hashlimit \
           --hashlimit-name scan \
@@ -488,7 +489,6 @@ $IPTABLES -A ANTI_STEALTHSCAN \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 960000 \
           -j DROP
-$IPTABLES -A ANTI_STEALTHSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
 $IPTABLES -A ANTI_STEALTHSCAN -j FW_PROWLER
 $IPTABLES -A ANTI_STEALTHSCAN -j DROP
 $IPTABLES -N FW_STEALTHSCAN 2>/dev/null
