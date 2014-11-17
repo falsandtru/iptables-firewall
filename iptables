@@ -360,7 +360,7 @@ $IPTABLES -A ANTI_PROWLER_MEDIUM -m recent --name spy-medium --set -j DROP
 $IPTABLES -N ANTI_PROWLER_SLOW
 $IPTABLES -A ANTI_PROWLER_SLOW -m recent --name spy-slow --update --rttl -j DROP
 $IPTABLES -A ANTI_PROWLER_SLOW -m recent --name spy-slow --set -j DROP
-$IPTABLES -N FW_PROWLER
+$IPTABLES -N FW_PROWLER 2>/dev/null
 $IPTABLES -A FW_PROWLER -i lo -j RETURN
 $IPTABLES -A FW_PROWLER -o lo -j RETURN
 $IPTABLES -A FW_PROWLER -o e+ -j RETURN
