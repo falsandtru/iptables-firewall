@@ -157,6 +157,7 @@ echo "PREPROCESS:	$PREPROCESS"
 `$PREPROCESS`
 
 # ロールチェーン生成
+$IPTABLES -N TRACK_PROWLER
 for ROLE in ${ROLES[@]}; do
     $IPTABLES -N $ROLE 2>/dev/null
     eval RULES="\${${ROLE}[@]}"
@@ -172,6 +173,7 @@ for ROLE in ${ROLES[@]}; do
             do
                 $IPTABLES -A $CHAIN -s $LINE -j RETURN
             done
+            $IPTABLES -A $CHAIN -j TRACK_PROWLER
             $IPTABLES -A $CHAIN -j DROP
             $IPTABLES -A $ROLE -j $CHAIN
         fi
@@ -327,13 +329,12 @@ $IPTABLES -A FW_INTRUDER -o lo -j RETURN
 $IPTABLES -A FW_INTRUDER -o e+ -j RETURN
 $IPTABLES -A FW_INTRUDER -o p+ -j RETURN
 $IPTABLES -A FW_INTRUDER -o w+ -j RETURN
-# 公表サーバーでは既知のポートはフィルタしない
+# 既知のポートはフィルタしない
 $IPTABLES -A FW_INTRUDER -p tcp --dport 0:1023 -j RETURN
 $IPTABLES -A FW_INTRUDER -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-rapid --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-fast --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-medium --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name spy-slow --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
@@ -348,18 +349,6 @@ $IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent -
 # ※不審なアクセスを長時間追跡する
 # ※正規の通信のフィルタとして使用不可
 # ※公表サーバーでは無効にしてよい
-$IPTABLES -N ANTI_PROWLER_RAPID
-$IPTABLES -A ANTI_PROWLER_RAPID -m recent --name spy-rapid --update --rttl -j DROP
-$IPTABLES -A ANTI_PROWLER_RAPID -m recent --name spy-rapid --set -j DROP
-$IPTABLES -N ANTI_PROWLER_FAST
-$IPTABLES -A ANTI_PROWLER_FAST -m recent --name spy-fast --update --rttl -j DROP
-$IPTABLES -A ANTI_PROWLER_FAST -m recent --name spy-fast --set -j DROP
-$IPTABLES -N ANTI_PROWLER_MEDIUM
-$IPTABLES -A ANTI_PROWLER_MEDIUM -m recent --name spy-medium --update --rttl -j DROP
-$IPTABLES -A ANTI_PROWLER_MEDIUM -m recent --name spy-medium --set -j DROP
-$IPTABLES -N ANTI_PROWLER_SLOW
-$IPTABLES -A ANTI_PROWLER_SLOW -m recent --name spy-slow --update --rttl -j DROP
-$IPTABLES -A ANTI_PROWLER_SLOW -m recent --name spy-slow --set -j DROP
 $IPTABLES -N TRACK_PROWLER 2>/dev/null
 $IPTABLES -A TRACK_PROWLER -i lo -j RETURN
 $IPTABLES -A TRACK_PROWLER -o lo -j RETURN
@@ -367,54 +356,35 @@ $IPTABLES -A TRACK_PROWLER -o e+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o p+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o w+ -j RETURN
 $IPTABLES -A TRACK_PROWLER \
-          -m hashlimit \
-          --hashlimit-name prowler-limit \
-          --hashlimit-above 1/s \
-          --hashlimit-burst 1 \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 800 \
-          -j DROP
-$IPTABLES -N TRACK_PROWLER_LIMIT
-$IPTABLES -A TRACK_PROWLER_LIMIT -m limit --limit 1000/s --limit-burst 10000 -j RETURN
-$IPTABLES -A TRACK_PROWLER_LIMIT -j DROP
-$IPTABLES -A TRACK_PROWLER -j TRACK_PROWLER_LIMIT
-$IPTABLES -A TRACK_PROWLER \
-          -m hashlimit \
-          --hashlimit-name prowler-rapid \
-          --hashlimit-above 1/s \
-          --hashlimit-burst 1 \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 1000 \
-          -j ANTI_PROWLER_RAPID
-$IPTABLES -A TRACK_PROWLER -m recent --name spy-rapid --set
-$IPTABLES -A TRACK_PROWLER \
+          -m recent --name prowler-fast --update --rttl \
           -m hashlimit \
           --hashlimit-name prowler-fast \
-          --hashlimit-above 1/h \
-          --hashlimit-burst 1 \
+          --hashlimit 6/m \
           --hashlimit-mode srcip \
-          --hashlimit-htable-expire 100000 \
-          -j ANTI_PROWLER_FAST
-$IPTABLES -A TRACK_PROWLER -m recent --name spy-fast --set
+          --hashlimit-htable-expire 10000 \
+          --hashlimit-htable-max 10000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --set
 $IPTABLES -A TRACK_PROWLER \
+          -m recent --name prowler-medium --update --rttl \
           -m hashlimit \
           --hashlimit-name prowler-medium \
-          --hashlimit-above 1/h \
-          --hashlimit-burst 1 \
+          --hashlimit 1/m \
           --hashlimit-mode srcip \
-          --hashlimit-htable-expire 1000000 \
-          -j ANTI_PROWLER_MEDIUM
-$IPTABLES -A TRACK_PROWLER -m recent --name spy-medium --set
+          --hashlimit-htable-expire 60000 \
+          --hashlimit-htable-max 10000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --set
 $IPTABLES -A TRACK_PROWLER \
+          -m recent --name prowler-slow --update --rttl \
           -m hashlimit \
           --hashlimit-name prowler-slow \
-          --hashlimit-above 1/d \
-          --hashlimit-burst 1 \
+          --hashlimit 1/h \
           --hashlimit-mode srcip \
-          --hashlimit-htable-expire 10000000 \
-          -j ANTI_PROWLER_SLOW
-$IPTABLES -A TRACK_PROWLER -m recent --name spy-slow --set
-$IPTABLES -A TRACK_PROWLER -j DROP
+          --hashlimit-htable-expire 3600000 \
+          --hashlimit-htable-max 10000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --set
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
 # ※IP spoofing攻撃対策
