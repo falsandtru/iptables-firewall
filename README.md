@@ -1,11 +1,9 @@
 # iptables firewall
 高機能iptables設定スクリプト。
 
-IPリスト、Firewall、IDS(IPS)などを任意に組み合わせたマルチレイヤフィルタをロールとして生成し、サービスごとに最適なロールを適用可能にする。
-
 ## Feature
 
-* ロールレベルパケットコントロール
+* ロールベースパケットコントロール
 * マルチレイヤフィルタリング
 * ファイアーウォール
 * ポートスキャントラップ
@@ -48,7 +46,7 @@ IDSまたはIPSを使用する場合に設定する。
 国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
 
 ### SECURE
-国別IPフィルタの構築中このフィルタを使用するアクセスをすべて遮断するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
+国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
 
 ### ROLES
 任意のロールを作成する。ロール名は大文字とアンダースコアの組み合わせでなければならない。
@@ -56,6 +54,11 @@ IDSまたはIPSを使用する場合に設定する。
 ```sh
 # TESTロールを作成
 ROLES=(TEST)
+```
+
+```sh
+# TESTロールを適用
+$IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 ```
 
 ### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC
@@ -67,15 +70,24 @@ ROLES=(TEST)
 ```sh
 # TESTロールにルールを設定
 TEST=(/etc/iptables/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-# 1. /etc/iptables/privateに記載されたIPのみ通過させ、ほかは破棄する。
-# 2. COUNTRY_FILTERに一致したIPのみ通過させ、ほかは破棄する。
-# 3. FIREWALLを適用しパケットを検疫する。
-# 4. 不審なIPを破棄する。
-# 5. 任意のパケットをIPSへ渡し処理を終える。
-# 6. 残りのパケットをすべて許可し処理を終える。
-
-# ロールを適用
-$IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
+# 1. /etc/iptables/private
+# ファイルに記載されたIPのみ通過させ、ほかは遮断する。
+#
+# 2. COUNTRY_FILTER
+# 許可した国のIPのみ通過させ、ほかは遮断する。
+#
+# 3. FIREWALL
+# Firewallを適用し接続を検疫する。
+#
+# 4. FW_INTRUDER
+# 攻撃行為または不審行為のあったIPを遮断する。
+#
+# 5. IPS
+# 指定のパケットをIPSへ渡し処理を終える。
+#
+# 6. ACCEPT
+# 渡されなかった残りのパケットをすべて許可し処理を終える。
+#
 ```
 
 ### PREPROCESS
@@ -107,6 +119,9 @@ ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
 
 ### FIREWALL
 不審なパケットを破棄し、そうでないパケットのみ通過させる。
+
+### FW_INTRUDER
+不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
 
 ### BLACKLIST
 一致するIPを破棄する。
@@ -170,6 +185,9 @@ $ vi /etc/logrotate.d/iptables
 }
 ```
 
+## License
+MIT License
+
 ## ChangeLog
 
 ### 0.4.2
@@ -187,7 +205,7 @@ $ vi /etc/logrotate.d/iptables
 ### 0.4.0
 
 * 仕様を刷新
-* サービスへのフィルタ設定をロールレベルに変更
+* サービスへのフィルタ設定をロールベースに変更
 * PREPROCESS機能を追加
 * POSTPROCESS機能を追加
 * Ingress攻撃対策を削除
