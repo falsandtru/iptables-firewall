@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.5.1
+# @version 0.5.2
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -14,19 +14,22 @@
 #----------------------------------------------------------#
 
 # 管理用ポート番号
-LOGIN=0
-
-# IP更新間隔(日)
-INTERVAL=7
-
-# IPSの使用
-IDSIPS=
+LOGIN=
 
 # 許可 日本
 ACCEPT_COUNTRY_CODE="JP"
 
 # 拒否 中国|香港|マカオ|韓国|北朝鮮
 DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
+
+# IP割り当て更新間隔(日)
+INTERVAL=7
+
+# ポートスキャントラップ
+TRAP=true
+
+# IPSの使用
+IDSIPS=
 
 # 厳格更新
 SECURE=
@@ -39,10 +42,10 @@ WHITELIST=
 ROLES=(LOCAL KEEP SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC)
 LOCAL=(IPS ACCEPT)
 KEEP=(FIREWALL IPS ACCEPT)
-SYSTEM=(/etc/iptables/system FIREWALL FW_INTRUDER IPS ACCEPT)
-NETWORK=(/etc/iptables/network FIREWALL FW_INTRUDER IPS ACCEPT)
-AUTH=(/etc/iptables/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-PRIVATE=(/etc/iptables/user COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
+NETWORK=(whitelist/network FIREWALL FW_INTRUDER IPS ACCEPT)
+AUTH=(whitelist/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+PRIVATE=(whitelist/user COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
 CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
 
@@ -58,6 +61,9 @@ LOG_LIMIT_BURST=1000
 IPTABLES=iptables
 
 # IPリスト保存先ディレクトリ
+LIST_DIR=/etc/iptables/
+
+# IP割り当て保存先ディレクトリ
 CACHE_DIR=/var/cache/iptables/
 
 
@@ -71,10 +77,11 @@ echo "iptables firewall"
 [[ ! $LOGIN -gt 0 ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
+# TRAP
+[ -z $TRAP ] && TRAP=false
+
 # SECURE
-if [ -z $SECURE ]; then
-    SECURE=false
-fi
+[ -z $SECURE ] && SECURE=false
 
 # IPS/IDS
 if [ -z $IDSIPS ]; then
@@ -158,14 +165,15 @@ for ROLE in ${ROLES[@]}; do
     $IPTABLES -N $ROLE 2>/dev/null
     eval RULES="\${${ROLE}[@]}"
     for RULE in ${RULES[@]}; do
-        if [ `echo $RULE | grep -E ^[A-Z_]\+$` ]; then
+        LIST_FILE=`echo $LIST_DIR$RULE | sed 's|.*//|/|'`
+        if [ `echo $RULE | grep -E ^[A-Z_]\+$` ] || [ `$IPTABLES -S | grep "^-N $RULE$"` ]; then
             $IPTABLES -N $RULE 2>/dev/null
             $IPTABLES -A $ROLE -j $RULE
-        elif [ -r $RULE ] || [ $SECURE != false ]; then
-            CHAIN=`echo $RULE | awk -F / '{print "file_"$NF}'`
+        elif [ -r $LIST_FILE ] || [ $SECURE != false ]; then
+            CHAIN=`echo $RULE | awk -F / '{print "WL_"$NF}' | cut -d. -f1`
             $IPTABLES -N $CHAIN 2>/dev/null
             $IPTABLES -F $CHAIN
-            for LINE in `cat $RULE | grep ^[0-9]`
+            for LINE in `cat $LIST_FILE | grep ^[0-9]`
             do
                 $IPTABLES -A $CHAIN -s $LINE -j RETURN
             done
@@ -228,16 +236,18 @@ $IPTABLES -A FORWARD -j PREFILTER
 $IPTABLES -A OUTPUT -j PREFILTER
 
 # ホワイトリストに一致するIPをブラックリスト形式のフィルタから除外する
-if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-    for LINE in `cat $WHITELIST | grep ^[0-9]`
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed 's|.*//|/|'`
+if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
+    for LINE in `cat $LIST_FILE | grep ^[0-9]`
     do
         $IPTABLES -A PREFILTER -s $LINE -j RETURN
     done
 fi
 
 # ブラックリストに一致するIPをDROPする
-if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-    for LINE in `cat $BLACKLIST | grep ^[0-9]`
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed 's|.*//|/|'`
+if [ $BLACKLIST ] && [ -s $LIST_FILE ]; then
+    for LINE in `cat $LIST_FILE | grep ^[0-9]`
     do
         $IPTABLES -A PREFILTER -s $LINE -j DROP
     done
@@ -330,9 +340,11 @@ $IPTABLES -A FW_INTRUDER -o w+ -j RETURN
 # 既知のポートはフィルタしない
 $IPTABLES -A FW_INTRUDER -p tcp --dport 0:1023 -j RETURN
 $IPTABLES -A FW_INTRUDER -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
+#$IPTABLES -A FIREWALL -j FW_INTRUDER && echo "FIREWALL:	ANTI_INTRUDER"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
@@ -353,31 +365,28 @@ $IPTABLES -A TRACK_PROWLER -o lo -j RETURN
 $IPTABLES -A TRACK_PROWLER -o e+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o p+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o w+ -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --update --rttl --seconds 10 -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-rapid --update --rttl --seconds 10 -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-rapid --set
+$IPTABLES -A TRACK_PROWLER \
+          -m hashlimit \
+          --hashlimit-name prowler-rapid \
+          --hashlimit-above 6/m \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 10000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --update --rttl --seconds 60 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --set
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --update --rttl --seconds 60 -j RETURN
+$IPTABLES -A TRACK_PROWLER \
+          -m hashlimit \
+          --hashlimit-name prowler-fast \
+          --hashlimit-above 1/m \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 60000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --update --rttl --seconds 3600 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --set
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --update --rttl --seconds 3600 -j RETURN
+#$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --update --rttl --seconds 86400 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --set
-
-# WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
-# ※IP spoofing攻撃対策
-$IPTABLES -N ANTI_SPOOFING
-$IPTABLES -A ANTI_SPOOFING -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPOOFING] : '
-$IPTABLES -A ANTI_SPOOFING -j TRACK_PROWLER
-$IPTABLES -A ANTI_SPOOFING -j DROP
-$IPTABLES -N FW_SPOOFING 2>/dev/null
-$IPTABLES -A FW_SPOOFING -i lo -j RETURN
-$IPTABLES -A FW_SPOOFING -o lo -j RETURN
-$IPTABLES -A FW_SPOOFING -o e+ -j RETURN
-$IPTABLES -A FW_SPOOFING -o p+ -j RETURN
-$IPTABLES -A FW_SPOOFING -o w+ -j RETURN
-$IPTABLES -A FW_SPOOFING -s 127.0.0.0/8    -j ANTI_SPOOFING
-$IPTABLES -A FW_SPOOFING -s 10.0.0.0/8     -j ANTI_SPOOFING
-$IPTABLES -A FW_SPOOFING -s 172.16.0.0/12  -j ANTI_SPOOFING
-$IPTABLES -A FW_SPOOFING -s 192.168.0.0/16 -j ANTI_SPOOFING
-$IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL:	ANTI_SPOOFING"
-$IPTABLES -A FW_BASIC -j FW_SPOOFING
 
 # 外部とのNetBIOS関連のアクセスはログを記録せずに破棄してNG
 $IPTABLES -N DENY_NETBIOS
@@ -416,6 +425,25 @@ $IPTABLES -A FW_INVALID -o w+ -j RETURN
 $IPTABLES -A FW_INVALID -m state --state INVALID -j DENY_INVALID
 $IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL:	DENY_INVALID"
 
+# WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
+# ※IP spoofing攻撃対策
+$IPTABLES -N ANTI_SPOOFING
+$IPTABLES -A ANTI_SPOOFING -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPOOFING] : '
+$IPTABLES -A ANTI_SPOOFING -j TRACK_PROWLER
+$IPTABLES -A ANTI_SPOOFING -j DROP
+$IPTABLES -N FW_SPOOFING 2>/dev/null
+$IPTABLES -A FW_SPOOFING -i lo -j RETURN
+$IPTABLES -A FW_SPOOFING -o lo -j RETURN
+$IPTABLES -A FW_SPOOFING -o e+ -j RETURN
+$IPTABLES -A FW_SPOOFING -o p+ -j RETURN
+$IPTABLES -A FW_SPOOFING -o w+ -j RETURN
+$IPTABLES -A FW_SPOOFING -s 127.0.0.0/8    -j ANTI_SPOOFING
+$IPTABLES -A FW_SPOOFING -s 10.0.0.0/8     -j ANTI_SPOOFING
+$IPTABLES -A FW_SPOOFING -s 172.16.0.0/12  -j ANTI_SPOOFING
+$IPTABLES -A FW_SPOOFING -s 192.168.0.0/16 -j ANTI_SPOOFING
+$IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL:	ANTI_SPOOFING"
+$IPTABLES -A FW_BASIC -j FW_SPOOFING
+
 # フラグの不正なパケットを破棄、1時間に3回を超えたらログを記録してNG
 # ※ステルススキャン対策
 # ※既知のポートはもともと隠密性がないため保護せず誤作動の回避を優先
@@ -425,14 +453,6 @@ $IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL:	DENY_INVALID"
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_STEALTHSCAN
 $IPTABLES -A ANTI_STEALTHSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
-$IPTABLES -A ANTI_STEALTHSCAN \
-          -m hashlimit \
-          --hashlimit-name scan \
-          --hashlimit 1/h \
-          --hashlimit-burst 3 \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 960000 \
-          -j DROP
 $IPTABLES -A ANTI_STEALTHSCAN -j TRACK_PROWLER
 $IPTABLES -A ANTI_STEALTHSCAN -j DROP
 $IPTABLES -N FW_STEALTHSCAN 2>/dev/null
@@ -467,7 +487,7 @@ $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL FIN,PSH,URG -j ANTI_STEALTHSC
 # XMAS
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j ANTI_STEALTHSCAN
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG,PSH -j ANTI_STEALTHSCAN
-$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL:	ANTI_STEALTHSCAN"
+#$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL:	ANTI_STEALTHSCAN"
 
 # pingは1秒間に4回を超えたらログを記録して破棄してNG
 # ※Ping of Death攻撃対策
@@ -770,7 +790,7 @@ $IPTABLES -A INPUT -p icmp --icmp-type parameter-problem -j SYSTEM && echo "SERV
 #$IPTABLES -A INPUT -p udp --dport 53 -j SYSTEM && echo "SERVICE:	DNS[SYSTEM]		INPUT[UDP:53]"
 
 # 管理用ポート(SSH等)を開放
-$IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j AUTH && echo "SERVICE:	SSH[AUTH]		INPUT[TCP:XXX]"
+$IPTABLES -A INPUT -p tcp -m multiport --dports $LOGIN -j AUTH && echo "SERVICE:	SSH[AUTH]		INPUT[TCP:$LOGIN]"
 
 # SNMP[UDP:160,161]ポートを開放AUTH
 #$IPTABLES -A INPUT -p udp --dport 160 -j SYSTEM && echo "SERVICE:	SNMP[SYSTEM]		INPUT[UDP:160]"
@@ -837,21 +857,20 @@ $IPTABLES -D BLACKLIST_COUNTRY 1 2>/dev/null
 # ※ポートスキャン対策
 # ※開けていないポートに1度でも触ったらアウト
 # ※公表サーバーでは無効にしてよい
-$IPTABLES -N TRAP_PORTSCAN
-$IPTABLES -A TRAP_PORTSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-$IPTABLES -A TRAP_PORTSCAN -j TRACK_PROWLER
-$IPTABLES -A TRAP_PORTSCAN -j DROP
-$IPTABLES -N FW_PORTSCAN
-$IPTABLES -A FW_PORTSCAN -i lo -j RETURN
-$IPTABLES -A FW_PORTSCAN -o lo -j RETURN
-$IPTABLES -A FW_PORTSCAN -o e+ -j RETURN
-$IPTABLES -A FW_PORTSCAN -o p+ -j RETURN
-$IPTABLES -A FW_PORTSCAN -o w+ -j RETURN
-$IPTABLES -A FW_PORTSCAN -j FW_BROADCAST
-$IPTABLES -A FW_PORTSCAN -j FW_MULTICAST
-$IPTABLES -A FW_PORTSCAN -j TRAP_PORTSCAN
-$IPTABLES -A INPUT -j FW_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN"
-$IPTABLES -A FORWARD -j FW_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN"
+if [ $TRAP != false ]; then
+    $IPTABLES -N TRAP_PORTSCAN
+    $IPTABLES -A TRAP_PORTSCAN -i lo -j RETURN
+    $IPTABLES -A TRAP_PORTSCAN -o lo -j RETURN
+    $IPTABLES -A TRAP_PORTSCAN -o e+ -j RETURN
+    $IPTABLES -A TRAP_PORTSCAN -o p+ -j RETURN
+    $IPTABLES -A TRAP_PORTSCAN -o w+ -j RETURN
+    $IPTABLES -A TRAP_PORTSCAN -j FW_BROADCAST
+    $IPTABLES -A TRAP_PORTSCAN -j FW_MULTICAST
+    $IPTABLES -A TRAP_PORTSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
+    $IPTABLES -A TRAP_PORTSCAN -j TRACK_PROWLER
+    $IPTABLES -A INPUT -j TRAP_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN"
+    $IPTABLES -A FORWARD -j TRAP_PORTSCAN && echo "FIREWALL:	TRAP_PORTSCAN"
+fi
 
 # POSTPROCESS
 echo "POSTPROCESS:	$POSTPROCESS"
