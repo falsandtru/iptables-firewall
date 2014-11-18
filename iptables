@@ -162,7 +162,7 @@ for ROLE in ${ROLES[@]}; do
             $IPTABLES -N $RULE 2>/dev/null
             $IPTABLES -A $ROLE -j $RULE
         elif [ -r $RULE ] || [ $SECURE != false ]; then
-            CHAIN=`echo $RULE | awk -F / '{print "file_"$NF}'`
+            CHAIN=`echo $RULE | awk -F / '{print "WL_"$NF}'`
             $IPTABLES -N $CHAIN 2>/dev/null
             $IPTABLES -F $CHAIN
             for LINE in `cat $RULE | grep ^[0-9]`

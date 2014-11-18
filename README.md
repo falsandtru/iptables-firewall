@@ -107,6 +107,11 @@ TEST=(/etc/iptables/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
 ### ROLE
 任意のロールを作成し任意のフィルタを設定する。フィルタはチェーンで指定またはファイルで生成する。
 
+### WL_filename
+ファイルを設定するとファイルに記述されたIPからホワイトリストフィルタを生成する。
+このフィルタは遮断したIPを不審なIPとして登録する。
+フィルタはファイル名で識別されるためファイル名を重複させないようにする必要がある。
+
 ```
 # /etc/iptables/authlist
 # プロバイダなどで制限
