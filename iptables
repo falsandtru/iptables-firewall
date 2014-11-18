@@ -14,13 +14,7 @@
 #----------------------------------------------------------#
 
 # 管理用ポート番号
-LOGIN=0
-
-# IP更新間隔(日)
-INTERVAL=7
-
-# IPSの使用
-IDSIPS=
+LOGIN=
 
 # 許可 日本
 ACCEPT_COUNTRY_CODE="JP"
@@ -28,8 +22,14 @@ ACCEPT_COUNTRY_CODE="JP"
 # 拒否 中国|香港|マカオ|韓国|北朝鮮
 DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
 
+# IP割り当て更新間隔(日)
+INTERVAL=7
+
 # ポートスキャントラップ
 TRAP=true
+
+# IPSの使用
+IDSIPS=
 
 # 厳格更新
 SECURE=
