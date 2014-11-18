@@ -330,10 +330,10 @@ $IPTABLES -A FW_INTRUDER -o w+ -j RETURN
 # 既知のポートはフィルタしない
 $IPTABLES -A FW_INTRUDER -p tcp --dport 0:1023 -j RETURN
 $IPTABLES -A FW_INTRUDER -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
 #$IPTABLES -A FIREWALL -j FW_INTRUDER && echo "FIREWALL:	ANTI_INTRUDER"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
