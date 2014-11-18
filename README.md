@@ -77,7 +77,7 @@ Type|Definition
 ----|----------
 Chain|大文字とアンダースコアの組み合わせまたは定義済みチェーン。
 Target|ターゲット。
-File|他のルールとみなされないすべてのルール。
+File|/etc/iptables/からの相対パスまたは絶対パス。
 
 #### Chain
 
@@ -93,8 +93,8 @@ WL_filename|ファイルから生成されるホワイトリストフィルタ�
 
 ```sh
 # TESTロールにルールを設定
-TEST=(/etc/iptables/whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-# 1. /etc/iptables/whitelist/private
+TEST=(whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+# 1. whitelist/private
 # ファイルに記述されたIPのみ通過させ、ほかは遮断する。
 #
 # 2. COUNTRY_FILTER
@@ -118,7 +118,7 @@ TEST=(/etc/iptables/whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS AC
 フィルタはファイル名で識別されるためファイル名を重複させない必要がある。
 
 ```
-# /etc/iptables/whitelist/auth
+# whitelist/auth
 # プロバイダなどで制限
 # http://www.tcpiputils.com/
 1.2.3.0/24
@@ -152,10 +152,10 @@ iptables -N CUSTOM_FILTER
 自動設定。
 
 ### BLACKLIST
-グローバルブラックリスト。一致するIPを破棄する。
+グローバルブラックリスト。一致するIPを破棄する。/etc/iptables/からの相対パスまたは絶対パスで指定。
 
 ```sh
-BLACKLIST=/etc/iptables/blacklist/blacklist
+BLACKLIST=blacklist/global
 ```
 
 ```
@@ -164,10 +164,10 @@ BLACKLIST=/etc/iptables/blacklist/blacklist
 ```
 
 ### WHITELIST
-グローバルホワイトリスト。一致するIPをBLACKLISTから除外する。
+グローバルホワイトリスト。一致するIPをBLACKLISTから除外する。/etc/iptables/からの相対パスまたは絶対パスで指定。
 
 ```sh
-WHITELIST=/etc/iptables/whitelist/whitelist
+WHITELIST=whitelist/global
 ```
 
 ```
@@ -223,6 +223,7 @@ MIT License
 
 ### 0.5.2
 
+* リストファイルの相対パス指定に対応
 * FW_STEALTHSCANをFIREWALLフィルタから除外
 * IP追跡処理を改善
 

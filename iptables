@@ -42,10 +42,10 @@ WHITELIST=
 ROLES=(LOCAL KEEP SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC)
 LOCAL=(IPS ACCEPT)
 KEEP=(FIREWALL IPS ACCEPT)
-SYSTEM=(/etc/iptables/whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
-NETWORK=(/etc/iptables/whitelist/network FIREWALL FW_INTRUDER IPS ACCEPT)
-AUTH=(/etc/iptables/whitelist/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-PRIVATE=(/etc/iptables/whitelist/user COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
+NETWORK=(whitelist/network FIREWALL FW_INTRUDER IPS ACCEPT)
+AUTH=(whitelist/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+PRIVATE=(whitelist/user COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
 CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
 
@@ -61,6 +61,9 @@ LOG_LIMIT_BURST=1000
 IPTABLES=iptables
 
 # IPリスト保存先ディレクトリ
+LIST_DIR=/etc/iptables/
+
+# IP割り当て保存先ディレクトリ
 CACHE_DIR=/var/cache/iptables/
 
 
@@ -162,14 +165,15 @@ for ROLE in ${ROLES[@]}; do
     $IPTABLES -N $ROLE 2>/dev/null
     eval RULES="\${${ROLE}[@]}"
     for RULE in ${RULES[@]}; do
+        LIST_FILE=`echo $LIST_DIR$RULE | sed 's|.*//|/|'`
         if [ `echo $RULE | grep -E ^[A-Z_]\+$` ] || [ `$IPTABLES -S | grep "^-N $RULE$"` ]; then
             $IPTABLES -N $RULE 2>/dev/null
             $IPTABLES -A $ROLE -j $RULE
-        elif [ -r $RULE ] || [ $SECURE != false ]; then
+        elif [ -r $LIST_FILE ] || [ $SECURE != false ]; then
             CHAIN=`echo $RULE | awk -F / '{print "WL_"$NF}' | cut -d. -f1`
             $IPTABLES -N $CHAIN 2>/dev/null
             $IPTABLES -F $CHAIN
-            for LINE in `cat $RULE | grep ^[0-9]`
+            for LINE in `cat $LIST_FILE | grep ^[0-9]`
             do
                 $IPTABLES -A $CHAIN -s $LINE -j RETURN
             done
@@ -232,16 +236,18 @@ $IPTABLES -A FORWARD -j PREFILTER
 $IPTABLES -A OUTPUT -j PREFILTER
 
 # ホワイトリストに一致するIPをブラックリスト形式のフィルタから除外する
-if [ $WHITELIST ] && [ -s $WHITELIST ]; then
-    for LINE in `cat $WHITELIST | grep ^[0-9]`
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed 's|.*//|/|'`
+if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
+    for LINE in `cat $LIST_FILE | grep ^[0-9]`
     do
         $IPTABLES -A PREFILTER -s $LINE -j RETURN
     done
 fi
 
 # ブラックリストに一致するIPをDROPする
-if [ $BLACKLIST ] && [ -s $BLACKLIST ]; then
-    for LINE in `cat $BLACKLIST | grep ^[0-9]`
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed 's|.*//|/|'`
+if [ $BLACKLIST ] && [ -s $LIST_FILE ]; then
+    for LINE in `cat $LIST_FILE | grep ^[0-9]`
     do
         $IPTABLES -A PREFILTER -s $LINE -j DROP
     done
