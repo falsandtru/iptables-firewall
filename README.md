@@ -3,7 +3,7 @@
 
 ## Feature
 
-* ロールベースパケットコントロール
+* ロールベースコントロール
 * マルチレイヤフィルタリング
 * ファイアーウォール
 * ポートスキャントラップ
@@ -45,11 +45,16 @@ IDSまたはIPSを使用する場合に設定する。
 
 国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
 
+### TRAP
+ポートスキャントラップの使用を切り替える。
+
 ### SECURE
 国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
 
 ### ROLES
-任意のロールを作成する。ロール名は大文字とアンダースコアの組み合わせでなければならない。
+任意のロールを作成する。
+
+#### Example
 
 ```sh
 # TESTロールを作成
@@ -61,11 +66,30 @@ ROLES=(TEST)
 $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 ```
 
-### LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC
-既定のロールルール設定。任意のチェーンと組み合わせを設定できる。チェーンは左から順に適用されマルチレイヤフィルタとして機能する。
+### RULES(LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
+既定のロールルール設定。ルールは左から順に適用される。
+ファイル、ユーザー定義チェーンおよびターゲット(ACCEPT/DROP/REJECT)を組み合わせて自由にルールを構築できる。
+最後のフィルタ(ルール)は通過させずパケットの処理を決定しなければならないため最後のルールにはターゲットを設定することが望ましい。
 
-ルールにファイルを指定した場合は記載されたIPのみを通過させるフィルタを生成し適用する。ファイルが存在しない場合はすべて通過する設定となる。
-外部で作成されたチェーンを使用する場合はプリプロセスでチェーンを作成する必要がある。
+#### Type
+
+Type|Definition
+----|----------
+Chain|大文字とアンダースコアの組み合わせまたは定義済みチェーン。
+Target|ターゲット。
+File|他のルールとみなされないすべてのルール。
+
+#### Chain
+
+Name|Description
+----|-----------
+COUNTRY_FILTER|ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
+FIREWALL|不審なパケットを破棄し、そうでないパケットのみ通過させる。
+FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
+IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
+WL_filename|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
+
+#### Example
 
 ```sh
 # TESTロールにルールを設定
@@ -90,6 +114,31 @@ TEST=(/etc/iptables/whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS AC
 #
 ```
 
+ルールにファイルを指定した場合、ファイルに記述されたIPからホワイトリストフィルタを生成し適用する。
+フィルタはファイル名で識別されるためファイル名を重複させない必要がある。
+
+```
+# /etc/iptables/whitelist/auth
+# プロバイダなどで制限
+# http://www.tcpiputils.com/
+1.2.3.0/24
+```
+
+外部で作成されたチェーンを使用する場合はプリプロセスでチェーンを作成する必要がある。
+
+```
+TEST=(CUSTOM_FILTER)
+...
+......
+PREPROCESS="sh /etc/iptables/script/preprocess.sh"
+```
+
+```
+#!/bin/sh
+# /etc/iptables/preprocess.sh
+iptables -N CUSTOM_FILTER
+```
+
 ### PREPROCESS
 事前に実行するコマンドを設定する。
 
@@ -102,46 +151,23 @@ TEST=(/etc/iptables/whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS AC
 ### NTP SERVER
 自動設定。
 
-## Chain
-
-### ROLE
-任意のロールを作成し任意のフィルタを設定する。フィルタはチェーンで指定またはファイルで生成する。
-
-### WL_filename
-ファイルを設定するとファイルに記述されたIPからホワイトリストフィルタを生成する。
-このフィルタは遮断したIPを不審なIPとして登録する。
-フィルタはファイル名で識別されるためファイル名を重複させないようにする必要がある。
-
-```
-# /etc/iptables/authlist
-# プロバイダなどで制限
-# http://www.tcpiputils.com/
-1.2.3.0/24
-```
-
-### COUNTRY_FILTER
-ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
-
-### FIREWALL
-不審なパケットを破棄し、そうでないパケットのみ通過させる。
-
-### FW_INTRUDER
-不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
-
 ### BLACKLIST
-一致するIPを破棄する。
-
-### WHITELIST
-一致するIPをBLACKLISTから除外する。
+グローバルブラックリスト。一致するIPを破棄する。
 
 ```sh
-BLACKLIST=/etc/iptables/blacklist
-WHITELIST=/etc/iptables/whitelist
+BLACKLIST=/etc/iptables/blacklist/blacklist
 ```
 
 ```
 # BLACKLIST
 1.2.3.0/24
+```
+
+### WHITELIST
+グローバルホワイトリスト。一致するIPをBLACKLISTから除外する。
+
+```sh
+WHITELIST=/etc/iptables/whitelist/whitelist
 ```
 
 ```
