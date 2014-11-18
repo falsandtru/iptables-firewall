@@ -75,14 +75,10 @@ echo "iptables firewall"
 echo "LOGIN:		$LOGIN"
 
 # TRAP
-if [ -z $TRAP ]; then
-    TRAP=false
-fi
+[ -z $TRAP ] && TRAP=false
 
 # SECURE
-if [ -z $SECURE ]; then
-    SECURE=false
-fi
+[ -z $SECURE ] && SECURE=false
 
 # IPS/IDS
 if [ -z $IDSIPS ]; then
