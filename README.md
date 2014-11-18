@@ -69,9 +69,9 @@ $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 
 ```sh
 # TESTロールにルールを設定
-TEST=(/etc/iptables/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-# 1. /etc/iptables/private
-# ファイルに記載されたIPのみ通過させ、ほかは遮断する。
+TEST=(/etc/iptables/whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+# 1. /etc/iptables/whitelist/private
+# ファイルに記述されたIPのみ通過させ、ほかは遮断する。
 #
 # 2. COUNTRY_FILTER
 # 許可した国のIPのみ通過させ、ほかは遮断する。
