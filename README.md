@@ -190,6 +190,10 @@ MIT License
 
 ## ChangeLog
 
+### 0.5.2
+
+* FW_STEALTHSCANをFIREWALLフィルタから除外
+
 ### 0.5.1
 
 * IP追跡処理を改善

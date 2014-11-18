@@ -425,14 +425,6 @@ $IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL:	DENY_INVALID"
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N ANTI_STEALTHSCAN
 $IPTABLES -A ANTI_STEALTHSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
-$IPTABLES -A ANTI_STEALTHSCAN \
-          -m hashlimit \
-          --hashlimit-name scan \
-          --hashlimit 1/h \
-          --hashlimit-burst 3 \
-          --hashlimit-mode srcip \
-          --hashlimit-htable-expire 960000 \
-          -j DROP
 $IPTABLES -A ANTI_STEALTHSCAN -j TRACK_PROWLER
 $IPTABLES -A ANTI_STEALTHSCAN -j DROP
 $IPTABLES -N FW_STEALTHSCAN 2>/dev/null
@@ -467,7 +459,7 @@ $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL FIN,PSH,URG -j ANTI_STEALTHSC
 # XMAS
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j ANTI_STEALTHSCAN
 $IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG,PSH -j ANTI_STEALTHSCAN
-$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL:	ANTI_STEALTHSCAN"
+#$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL:	ANTI_STEALTHSCAN"
 
 # pingは1秒間に4回を超えたらログを記録して破棄してNG
 # ※Ping of Death攻撃対策
