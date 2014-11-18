@@ -193,6 +193,7 @@ MIT License
 ### 0.5.2
 
 * FW_STEALTHSCANをFIREWALLフィルタから除外
+* IP追跡処理を改善
 
 ### 0.5.1
 

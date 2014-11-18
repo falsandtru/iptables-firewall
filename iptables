@@ -330,9 +330,11 @@ $IPTABLES -A FW_INTRUDER -o w+ -j RETURN
 # 既知のポートはフィルタしない
 $IPTABLES -A FW_INTRUDER -p tcp --dport 0:1023 -j RETURN
 $IPTABLES -A FW_INTRUDER -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
+$IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER
 $IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
 $IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
 $IPTABLES -A FW_INTRUDER -m limit --limit 1000/s --limit-burst 10000 -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
+#$IPTABLES -A FIREWALL -j FW_INTRUDER && echo "FIREWALL:	ANTI_INTRUDER"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
@@ -353,11 +355,27 @@ $IPTABLES -A TRACK_PROWLER -o lo -j RETURN
 $IPTABLES -A TRACK_PROWLER -o e+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o p+ -j RETURN
 $IPTABLES -A TRACK_PROWLER -o w+ -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --update --rttl --seconds 10 -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-rapid --update --rttl --seconds 10 -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-rapid --set
+$IPTABLES -A TRACK_PROWLER \
+          -m hashlimit \
+          --hashlimit-name prowler-rapid \
+          --hashlimit-above 6/m \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 10000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --update --rttl --seconds 60 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --set
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --update --rttl --seconds 60 -j RETURN
+$IPTABLES -A TRACK_PROWLER \
+          -m hashlimit \
+          --hashlimit-name prowler-fast \
+          --hashlimit-above 1/m \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 60000 \
+          -j RETURN
+$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --update --rttl --seconds 3600 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --set
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --update --rttl --seconds 3600 -j RETURN
+#$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --update --rttl --seconds 86400 -j RETURN
 $IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --set
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
