@@ -158,7 +158,7 @@ for ROLE in ${ROLES[@]}; do
     $IPTABLES -N $ROLE 2>/dev/null
     eval RULES="\${${ROLE}[@]}"
     for RULE in ${RULES[@]}; do
-        if [ `echo $RULE | grep -E ^[A-Z_]\+$` ]; then
+        if [ `echo $RULE | grep -E ^[A-Z_]\+$` ] || [ `$IPTABLES -S | grep "^-N $RULE$"` ]; then
             $IPTABLES -N $RULE 2>/dev/null
             $IPTABLES -A $ROLE -j $RULE
         elif [ -r $RULE ] || [ $SECURE != false ]; then
