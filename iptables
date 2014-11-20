@@ -943,8 +943,14 @@ echo "POSTPROCESS	$POSTPROCESS"
 #----------------------------------------------------------#
 
 # 設定保存(/etc/sysconfig/iptablesの既存の設定は削除)
-service iptables save
-sysctl -p 2>&1 | grep -v -E "^error:.*(ipv6|bridge-nf-call)"
-service rsyslog restart
+echo "Enter or y > save, n or timeout > revert"
+read -t 60 input
+if [ $? -eq 0 ] && [ "$input" != n ]; then
+    service iptables save
+    sysctl -p 2>&1 | grep -v -E "^error:.*(ipv6|bridge-nf-call)"
+    service rsyslog restart
+else
+    service iptables restart
+fi
 
 echo complete
