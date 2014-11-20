@@ -376,49 +376,45 @@ sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.conf
 echo "net.ipv4.tcp_timestamps=1" >> /etc/sysctl.conf
 
 # ブロードキャストパケットをログを記録せずに破棄
-$IPTABLES -N DENY_BROADCAST
-$IPTABLES -A DENY_BROADCAST -j DROP
 $IPTABLES -N FW_BROADCAST 2>/dev/null
-$IPTABLES -A FW_BROADCAST -o lo -j RETURN
-$IPTABLES -A FW_BROADCAST -o e+ -j RETURN
-$IPTABLES -A FW_BROADCAST -o p+ -j RETURN
-$IPTABLES -A FW_BROADCAST -o w+ -j RETURN
-$IPTABLES -A FW_BROADCAST -m pkttype --pkt-type broadcast -j DENY_BROADCAST
+$IPTABLES -N DENY_BROADCAST
+$IPTABLES -A FW_BROADCAST -i e+ -j DENY_BROADCAST
+$IPTABLES -A FW_BROADCAST -i p+ -j DENY_BROADCAST
+$IPTABLES -A FW_BROADCAST -i w+ -j DENY_BROADCAST
+$IPTABLES -A DENY_BROADCAST -m pkttype --pkt-type broadcast -j DROP
 $IPTABLES -A FIREWALL -j FW_BROADCAST && echo "FIREWALL	DENY_BROADCAST"
 $IPTABLES -A FW_BASIC -j FW_BROADCAST
 
 # マルチキャストパケットをログを記録せずに破棄
-$IPTABLES -N DENY_MULTICAST
-$IPTABLES -A DENY_MULTICAST -j DROP
 $IPTABLES -N FW_MULTICAST 2>/dev/null
-$IPTABLES -A FW_MULTICAST -o lo -j RETURN
-$IPTABLES -A FW_MULTICAST -o e+ -j RETURN
-$IPTABLES -A FW_MULTICAST -o p+ -j RETURN
-$IPTABLES -A FW_MULTICAST -o w+ -j RETURN
-$IPTABLES -A FW_MULTICAST -m pkttype --pkt-type multicast -j DENY_MULTICAST
+$IPTABLES -N DENY_MULTICAST
+$IPTABLES -A FW_MULTICAST -i e+ -j DENY_MULTICAST
+$IPTABLES -A FW_MULTICAST -i p+ -j DENY_MULTICAST
+$IPTABLES -A FW_MULTICAST -i w+ -j DENY_MULTICAST
+$IPTABLES -A DENY_MULTICAST -m pkttype --pkt-type multicast -j DROP
 $IPTABLES -A FIREWALL -j FW_MULTICAST && echo "FIREWALL	DENY_MULTICAST"
 $IPTABLES -A FW_BASIC -j FW_MULTICAST
 
 # 不正なアクセスを行ったIPからのすべてのアクセスをログを記録して破棄
 # ※調査的アクセスから公開ポートを隠蔽する
 # ※公表サーバーでは無効にしてよい
-$IPTABLES -N ANTI_INTRUDER
-$IPTABLES -A ANTI_INTRUDER -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
-$IPTABLES -A ANTI_INTRUDER -j DROP
 $IPTABLES -N FW_INTRUDER 2>/dev/null
-$IPTABLES -A FW_INTRUDER -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_INTRUDER -i lo -j RETURN
-$IPTABLES -A FW_INTRUDER -o lo -j RETURN
-$IPTABLES -A FW_INTRUDER -o e+ -j RETURN
-$IPTABLES -A FW_INTRUDER -o p+ -j RETURN
-$IPTABLES -A FW_INTRUDER -o w+ -j RETURN
+$IPTABLES -N ANTI_INTRUDER
+$IPTABLES -N ANTI_INTRUDER_
+$IPTABLES -N ANTI_INTRUDER__
+$IPTABLES -A FW_INTRUDER -p tcp ! --dport 0:1023 -m state --state NEW,INVALID -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -p udp -m state --state NEW,INVALID -j ANTI_INTRUDER
+$IPTABLES -A FW_INTRUDER -p icmp -j ANTI_INTRUDER
+$IPTABLES -A ANTI_INTRUDER -i e+ -j ANTI_INTRUDER_
+$IPTABLES -A ANTI_INTRUDER -i p+ -j ANTI_INTRUDER_
+$IPTABLES -A ANTI_INTRUDER -i w+ -j ANTI_INTRUDER_
 # 既知のポートはフィルタしない
-$IPTABLES -A FW_INTRUDER -p tcp --dport 0:1023 -j RETURN
-$IPTABLES -A FW_INTRUDER -p tcp -m state --state ESTABLISHED,RELATED -j RETURN
-$IPTABLES -A FW_INTRUDER -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
+$IPTABLES -A ANTI_INTRUDER__ -j DROP
 #$IPTABLES -A FIREWALL -j FW_INTRUDER && echo "FIREWALL	ANTI_INTRUDER"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
@@ -435,87 +431,92 @@ $IPTABLES -A FW_INTRUDER -m recent --name prowler-slow --update --rttl -j ANTI_I
 # ※正規の通信のフィルタとして使用不可
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N TRACK_PROWLER 2>/dev/null
-$IPTABLES -A TRACK_PROWLER -i lo -j RETURN
-$IPTABLES -A TRACK_PROWLER -o lo -j RETURN
-$IPTABLES -A TRACK_PROWLER -o e+ -j RETURN
-$IPTABLES -A TRACK_PROWLER -o p+ -j RETURN
-$IPTABLES -A TRACK_PROWLER -o w+ -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-rapid --update --rttl --seconds 10 -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-rapid --set
-$IPTABLES -A TRACK_PROWLER \
+$IPTABLES -N ANTI_PROWLER
+$IPTABLES -N ANTI_PROWLER_
+$IPTABLES -A TRACK_PROWLER -j ANTI_PROWLER
+$IPTABLES -A ANTI_PROWLER -i e+ -j ANTI_PROWLER_
+$IPTABLES -A ANTI_PROWLER -i p+ -j ANTI_PROWLER_
+$IPTABLES -A ANTI_PROWLER -i w+ -j ANTI_PROWLER_
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-rapid --update --rttl --seconds 10 -j RETURN
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-rapid --set
+$IPTABLES -A ANTI_PROWLER_ \
           -m hashlimit \
           --hashlimit-name prowler-rapid \
           --hashlimit-above 6/m \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 10000 \
           -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --update --rttl --seconds 60 -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-fast --set
-$IPTABLES -A TRACK_PROWLER \
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-fast --update --rttl --seconds 60 -j RETURN
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-fast --set
+$IPTABLES -A ANTI_PROWLER_ \
           -m hashlimit \
           --hashlimit-name prowler-fast \
           --hashlimit-above 1/m \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 60000 \
           -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --update --rttl --seconds 3600 -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-medium --set
-#$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --update --rttl --seconds 86400 -j RETURN
-$IPTABLES -A TRACK_PROWLER -m recent --name prowler-slow --set
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-medium --update --rttl --seconds 3600 -j RETURN
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-medium --set
+#$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-slow --update --rttl --seconds 86400 -j RETURN
+$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-slow --set
 
 # 外部とのNetBIOS関連のアクセスはログを記録せずに破棄してNG
-$IPTABLES -N DENY_NETBIOS
-$IPTABLES -A DENY_NETBIOS -j TRACK_PROWLER
-$IPTABLES -A DENY_NETBIOS -j DROP
 $IPTABLES -N FW_NETBIOS 2>/dev/null
-$IPTABLES -A FW_NETBIOS -p tcp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS
-$IPTABLES -A FW_NETBIOS -p udp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS
+$IPTABLES -N DENY_NETBIOS
+$IPTABLES -N DENY_NETBIOS_
+$IPTABLES -A FW_NETBIOS -i e+ -j DENY_NETBIOS
+$IPTABLES -A FW_NETBIOS -i p+ -j DENY_NETBIOS
+$IPTABLES -A FW_NETBIOS -i w+ -j DENY_NETBIOS
+$IPTABLES -A DENY_NETBIOS -p tcp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS_
+$IPTABLES -A DENY_NETBIOS -p udp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS_
+$IPTABLES -A DENY_NETBIOS_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES NETBIOS] : '
+$IPTABLES -A DENY_NETBIOS_ -j TRACK_PROWLER
+$IPTABLES -A DENY_NETBIOS_ -j DROP
 $IPTABLES -A FIREWALL -j FW_NETBIOS && echo "FIREWALL	DENY_NETBIOS"
 $IPTABLES -A FW_BASIC -j FW_NETBIOS
 
 # フラグメント化されたパケットをログを記録して破棄してNG
-$IPTABLES -N DENY_FRAGMENT
-$IPTABLES -A DENY_FRAGMENT -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES FRAGMENT] : '
-$IPTABLES -A DENY_FRAGMENT -j TRACK_PROWLER
-$IPTABLES -A DENY_FRAGMENT -j DROP
 $IPTABLES -N FW_FRAGMENT 2>/dev/null
-$IPTABLES -A FW_FRAGMENT -i lo -j RETURN
-$IPTABLES -A FW_FRAGMENT -o lo -j RETURN
-$IPTABLES -A FW_FRAGMENT -o e+ -j RETURN
-$IPTABLES -A FW_FRAGMENT -o p+ -j RETURN
-$IPTABLES -A FW_FRAGMENT -o w+ -j RETURN
-$IPTABLES -A FW_FRAGMENT -f -j DENY_FRAGMENT
+$IPTABLES -N DENY_FRAGMENT
+$IPTABLES -N DENY_FRAGMENT_
+$IPTABLES -A FW_FRAGMENT -i e+ -j DENY_FRAGMENT
+$IPTABLES -A FW_FRAGMENT -i p+ -j DENY_FRAGMENT
+$IPTABLES -A FW_FRAGMENT -i w+ -j DENY_FRAGMENT
+$IPTABLES -A DENY_FRAGMENT -f -j DENY_FRAGMENT_
+$IPTABLES -A DENY_FRAGMENT_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES FRAGMENT] : '
+$IPTABLES -A DENY_FRAGMENT_ -j TRACK_PROWLER
+$IPTABLES -A DENY_FRAGMENT_ -j DROP
 $IPTABLES -A FIREWALL -j FW_FRAGMENT && echo "FIREWALL	DENY_FRAGMENT"
 
 # 不正なパケットをログを記録して破棄してNG
-$IPTABLES -N DENY_INVALID
-$IPTABLES -A DENY_INVALID -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INVALID] : '
-$IPTABLES -A DENY_INVALID -j DROP
 $IPTABLES -N FW_INVALID 2>/dev/null
-$IPTABLES -A FW_INVALID -i lo -j RETURN
-$IPTABLES -A FW_INVALID -o lo -j RETURN
-$IPTABLES -A FW_INVALID -o e+ -j RETURN
-$IPTABLES -A FW_INVALID -o p+ -j RETURN
-$IPTABLES -A FW_INVALID -o w+ -j RETURN
-$IPTABLES -A FW_INVALID -m state --state INVALID -j DENY_INVALID
+$IPTABLES -N DENY_INVALID
+$IPTABLES -N DENY_INVALID_
+$IPTABLES -A FW_INVALID -i e+ -j DENY_INVALID
+$IPTABLES -A FW_INVALID -i p+ -j DENY_INVALID
+$IPTABLES -A FW_INVALID -i w+ -j DENY_INVALID
+$IPTABLES -A DENY_INVALID -m state --state INVALID -j DENY_INVALID_
+$IPTABLES -A DENY_INVALID_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INVALID] : '
+$IPTABLES -A DENY_INVALID_ -j DROP
 $IPTABLES -A FIREWALL -j FW_INVALID && echo "FIREWALL	DENY_INVALID"
 
 # WANからの送信元がプライベートIPアドレスのパケットをログを記録して破棄してNG
 # ※IP spoofing攻撃対策
-$IPTABLES -N ANTI_SPOOFING
-$IPTABLES -A ANTI_SPOOFING -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPOOFING] : '
-$IPTABLES -A ANTI_SPOOFING -j TRACK_PROWLER
-$IPTABLES -A ANTI_SPOOFING -j DROP
 $IPTABLES -N FW_SPOOFING 2>/dev/null
-$IPTABLES -A FW_SPOOFING -i lo -j RETURN
-$IPTABLES -A FW_SPOOFING -o lo -j RETURN
-$IPTABLES -A FW_SPOOFING -o e+ -j RETURN
-$IPTABLES -A FW_SPOOFING -o p+ -j RETURN
-$IPTABLES -A FW_SPOOFING -o w+ -j RETURN
-$IPTABLES -A FW_SPOOFING -s 127.0.0.0/8    -j ANTI_SPOOFING
-$IPTABLES -A FW_SPOOFING -s 10.0.0.0/8     -j ANTI_SPOOFING
-$IPTABLES -A FW_SPOOFING -s 172.16.0.0/12  -j ANTI_SPOOFING
-$IPTABLES -A FW_SPOOFING -s 192.168.0.0/16 -j ANTI_SPOOFING
+$IPTABLES -N ANTI_SPOOFING
+$IPTABLES -N ANTI_SPOOFING_
+$IPTABLES -N ANTI_SPOOFING__
+$IPTABLES -A FW_SPOOFING -j ANTI_SPOOFING
+$IPTABLES -A ANTI_SPOOFING -i e+ -j ANTI_SPOOFING_
+$IPTABLES -A ANTI_SPOOFING -i p+ -j ANTI_SPOOFING_
+$IPTABLES -A ANTI_SPOOFING -i w+ -j ANTI_SPOOFING_
+$IPTABLES -A ANTI_SPOOFING_ -s 127.0.0.0/8    -j ANTI_SPOOFING__
+$IPTABLES -A ANTI_SPOOFING_ -s 10.0.0.0/8     -j ANTI_SPOOFING__
+$IPTABLES -A ANTI_SPOOFING_ -s 172.16.0.0/12  -j ANTI_SPOOFING__
+$IPTABLES -A ANTI_SPOOFING_ -s 192.168.0.0/16 -j ANTI_SPOOFING__
+$IPTABLES -A ANTI_SPOOFING__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPOOFING] : '
+$IPTABLES -A ANTI_SPOOFING__ -j TRACK_PROWLER
+$IPTABLES -A ANTI_SPOOFING__ -j DROP
 $IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL	ANTI_SPOOFING"
 $IPTABLES -A FW_BASIC -j FW_SPOOFING
 
@@ -526,48 +527,53 @@ $IPTABLES -A FW_BASIC -j FW_SPOOFING
 # ※FW_PORTSCANとFW_INTRUDERが機能しているうちは有効にする必要性は低い
 # ※フラグパターンの妥当性未検証
 # ※公表サーバーでは無効にしてよい
-$IPTABLES -N ANTI_STEALTHSCAN
-$IPTABLES -A ANTI_STEALTHSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
-$IPTABLES -A ANTI_STEALTHSCAN -j TRACK_PROWLER
-$IPTABLES -A ANTI_STEALTHSCAN -j DROP
 $IPTABLES -N FW_STEALTHSCAN 2>/dev/null
-$IPTABLES -A FW_STEALTHSCAN -i lo -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -o lo -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -o e+ -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -o p+ -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -o w+ -j RETURN
-$IPTABLES -A FW_STEALTHSCAN ! -p tcp -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -p tcp --dport 0:1023 -j RETURN
-$IPTABLES -A FW_STEALTHSCAN -p tcp -m state ! --state NEW -j RETURN
+$IPTABLES -N ANTI_STEALTHSCAN
+$IPTABLES -N ANTI_STEALTHSCAN_
+$IPTABLES -N ANTI_STEALTHSCAN__
+$IPTABLES -A FW_STEALTHSCAN -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN -i e+ -p tcp -m state --state NEW -j ANTI_STEALTHSCAN_
+$IPTABLES -A ANTI_STEALTHSCAN -i p+ -p tcp -m state --state NEW -j ANTI_STEALTHSCAN_
+$IPTABLES -A ANTI_STEALTHSCAN -i w+ -p tcp -m state --state NEW -j ANTI_STEALTHSCAN_
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --dport 0:1023 -j RETURN
 # SYN + ACK when NEW
-$IPTABLES -A FW_STEALTHSCAN -p tcp -m state --state NEW --tcp-flags SYN,ACK SYN,ACK -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp -m state --state NEW --tcp-flags SYN,ACK SYN,ACK -j ANTI_STEALTHSCAN__
 # FIN/PSH/URG without ACK
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ACK,FIN FIN -j ANTI_STEALTHSCAN
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ACK,PSH PSH -j ANTI_STEALTHSCAN
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ACK,URG URG -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ACK,FIN FIN -j ANTI_STEALTHSCAN__
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ACK,PSH PSH -j ANTI_STEALTHSCAN__
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ACK,URG URG -j ANTI_STEALTHSCAN__
 # SYN + FIN
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags SYN,FIN SYN,FIN -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags SYN,FIN SYN,FIN -j ANTI_STEALTHSCAN__
 # SYN + RST
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags SYN,RST SYN,RST -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags SYN,RST SYN,RST -j ANTI_STEALTHSCAN__
 # FIN + RST
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags FIN,RST FIN,RST -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags FIN,RST FIN,RST -j ANTI_STEALTHSCAN__
 # ALL
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL ALL -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL ALL -j ANTI_STEALTHSCAN__
 # nmap Null scans / no flags
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL NONE -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL NONE -j ANTI_STEALTHSCAN__
 # nmap FIN stealth scan
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL FIN -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL FIN -j ANTI_STEALTHSCAN__
 # FIN + URG + PSH
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL FIN,PSH,URG -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL FIN,PSH,URG -j ANTI_STEALTHSCAN__
 # XMAS
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j ANTI_STEALTHSCAN
-$IPTABLES -A FW_STEALTHSCAN -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG,PSH -j ANTI_STEALTHSCAN
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j ANTI_STEALTHSCAN__
+$IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG,PSH -j ANTI_STEALTHSCAN__
+$IPTABLES -A ANTI_STEALTHSCAN__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
+$IPTABLES -A ANTI_STEALTHSCAN__ -j TRACK_PROWLER
+$IPTABLES -A ANTI_STEALTHSCAN__ -j DROP
 #$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL	ANTI_STEALTHSCAN"
 
 # pingは1秒間に4回を超えたらログを記録して破棄してNG
 # ※Ping of Death攻撃対策
+$IPTABLES -N FW_PINGDEATH 2>/dev/null
 $IPTABLES -N ANTI_PINGDEATH
-$IPTABLES -A ANTI_PINGDEATH \
+$IPTABLES -N ANTI_PINGDEATH_
+$IPTABLES -A FW_PINGDEATH -i e+ -p icmp --icmp-type echo-request -j ANTI_PINGDEATH
+$IPTABLES -A FW_PINGDEATH -i p+ -p icmp --icmp-type echo-request -j ANTI_PINGDEATH
+$IPTABLES -A FW_PINGDEATH -i w+ -p icmp --icmp-type echo-request -j ANTI_PINGDEATH
+$IPTABLES -A ANTI_PINGDEATH -j ANTI_PINGDEATH_
+$IPTABLES -A ANTI_PINGDEATH_ \
           -m hashlimit \
           --hashlimit-name ping \
           --hashlimit 1/s \
@@ -575,16 +581,9 @@ $IPTABLES -A ANTI_PINGDEATH \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 1000 \
           -j RETURN
-$IPTABLES -A ANTI_PINGDEATH -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PINGDEATH] : '
-$IPTABLES -A ANTI_PINGDEATH -j TRACK_PROWLER
-$IPTABLES -A ANTI_PINGDEATH -j DROP
-$IPTABLES -N FW_PINGDEATH 2>/dev/null
-$IPTABLES -A FW_PINGDEATH -i lo -j RETURN
-$IPTABLES -A FW_PINGDEATH -o lo -j RETURN
-$IPTABLES -A FW_PINGDEATH -o e+ -j RETURN
-$IPTABLES -A FW_PINGDEATH -o p+ -j RETURN
-$IPTABLES -A FW_PINGDEATH -o w+ -j RETURN
-$IPTABLES -A FW_PINGDEATH -p icmp --icmp-type echo-request -j ANTI_PINGDEATH
+$IPTABLES -A ANTI_PINGDEATH_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PINGDEATH] : '
+$IPTABLES -A ANTI_PINGDEATH_ -j TRACK_PROWLER
+$IPTABLES -A ANTI_PINGDEATH_ -j DROP
 $IPTABLES -A FIREWALL -j FW_PINGDEATH && echo "FIREWALL	ANTI_PINGDEATH"
 
 # 過大なアクセスをIP単位で制限
@@ -598,8 +597,14 @@ $IPTABLES -A FIREWALL -j FW_PINGDEATH && echo "FIREWALL	ANTI_PINGDEATH"
 # --hashlimit-htable-expire ms ：ハッシュテーブル内のレコードの有効期間(単位：ミリ秒)
 #
 # HTTPポートへの過大なアクセスをログを記録して破棄
+$IPTABLES -N FW_SYNFLOOD 2>/dev/null
 $IPTABLES -N ANTI_SYNFLOOD
-$IPTABLES -A ANTI_SYNFLOOD \
+$IPTABLES -N ANTI_SYNFLOOD_
+$IPTABLES -A FW_SYNFLOOD -p tcp --dport 80 -j ANTI_SYNFLOOD
+$IPTABLES -A ANTI_SYNFLOOD -i e+ -p tcp -m state --state NEW -j ANTI_SYNFLOOD_
+$IPTABLES -A ANTI_SYNFLOOD -i p+ -p tcp -m state --state NEW -j ANTI_SYNFLOOD_
+$IPTABLES -A ANTI_SYNFLOOD -i w+ -p tcp -m state --state NEW -j ANTI_SYNFLOOD_
+$IPTABLES -A ANTI_SYNFLOOD_ \
           -m hashlimit \
           --hashlimit-name http \
           --hashlimit 10/m \
@@ -607,20 +612,19 @@ $IPTABLES -A ANTI_SYNFLOOD \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 60000 \
           -j RETURN
-$IPTABLES -A ANTI_SYNFLOOD -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SYNFLOOD] : '
-$IPTABLES -A ANTI_SYNFLOOD -j DROP
-$IPTABLES -N FW_SYNFLOOD 2>/dev/null
-$IPTABLES -A FW_SYNFLOOD -i lo -j RETURN
-$IPTABLES -A FW_SYNFLOOD -o lo -j RETURN
-$IPTABLES -A FW_SYNFLOOD -o e+ -j RETURN
-$IPTABLES -A FW_SYNFLOOD -o p+ -j RETURN
-$IPTABLES -A FW_SYNFLOOD -o w+ -j RETURN
-$IPTABLES -A FW_SYNFLOOD -p tcp --dport 80 -m state --state NEW -j ANTI_SYNFLOOD
+$IPTABLES -A ANTI_SYNFLOOD_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SYNFLOOD] : '
+$IPTABLES -A ANTI_SYNFLOOD_ -j DROP
 $IPTABLES -A FIREWALL -j FW_SYNFLOOD && echo "FIREWALL	ANTI_SYNFLOOD"
 #
 # HTTPSポートへの過大なアクセスをログを記録して破棄
+$IPTABLES -N FW_SYNFLOOD_SSL 2>/dev/null
 $IPTABLES -N ANTI_SYNFLOOD_SSL
-$IPTABLES -A ANTI_SYNFLOOD_SSL \
+$IPTABLES -N ANTI_SYNFLOOD_SSL_
+$IPTABLES -A FW_SYNFLOOD_SSL -p tcp --dport 443 -j ANTI_SYNFLOOD_SSL
+$IPTABLES -A ANTI_SYNFLOOD_SSL -i e+ -p tcp -m state --state NEW -j ANTI_SYNFLOOD_SSL_
+$IPTABLES -A ANTI_SYNFLOOD_SSL -i p+ -p tcp -m state --state NEW -j ANTI_SYNFLOOD_SSL_
+$IPTABLES -A ANTI_SYNFLOOD_SSL -i w+ -p tcp -m state --state NEW -j ANTI_SYNFLOOD_SSL_
+$IPTABLES -A ANTI_SYNFLOOD_SSL_ \
           -m hashlimit \
           --hashlimit-name https \
           --hashlimit 30/m \
@@ -628,20 +632,19 @@ $IPTABLES -A ANTI_SYNFLOOD_SSL \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 60000 \
           -j RETURN
-$IPTABLES -A ANTI_SYNFLOOD_SSL -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SYNFLOOD(SSL)] : '
-$IPTABLES -A ANTI_SYNFLOOD_SSL -j DROP
-$IPTABLES -N FW_SYNFLOOD_SSL 2>/dev/null
-$IPTABLES -A FW_SYNFLOOD_SSL -i lo -j RETURN
-$IPTABLES -A FW_SYNFLOOD_SSL -o lo -j RETURN
-$IPTABLES -A FW_SYNFLOOD_SSL -o e+ -j RETURN
-$IPTABLES -A FW_SYNFLOOD_SSL -o p+ -j RETURN
-$IPTABLES -A FW_SYNFLOOD_SSL -o w+ -j RETURN
-$IPTABLES -A FW_SYNFLOOD_SSL -p tcp --dport 443 -m state --state NEW -j ANTI_SYNFLOOD_SSL
+$IPTABLES -A ANTI_SYNFLOOD_SSL_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SYNFLOOD(SSL)] : '
+$IPTABLES -A ANTI_SYNFLOOD_SSL_ -j DROP
 $IPTABLES -A FIREWALL -j FW_SYNFLOOD_SSL && echo "FIREWALL	ANTI_SYNFLOOD_SSL"
 #
 # UDPによる過大なアクセスをログを記録して破棄
+$IPTABLES -N FW_UDPFLOOD 2>/dev/null
 $IPTABLES -N ANTI_UDPFLOOD
-$IPTABLES -A ANTI_UDPFLOOD \
+$IPTABLES -N ANTI_UDPFLOOD_
+$IPTABLES -A FW_UDPFLOOD -j ANTI_UDPFLOOD
+$IPTABLES -A ANTI_UDPFLOOD -i e+ -p udp -m state --state NEW -j ANTI_UDPFLOOD_
+$IPTABLES -A ANTI_UDPFLOOD -i p+ -p udp -m state --state NEW -j ANTI_UDPFLOOD_
+$IPTABLES -A ANTI_UDPFLOOD -i w+ -p udp -m state --state NEW -j ANTI_UDPFLOOD_
+$IPTABLES -A ANTI_UDPFLOOD_ \
           -m hashlimit \
           --hashlimit-name udp \
           --hashlimit 30/m \
@@ -649,20 +652,19 @@ $IPTABLES -A ANTI_UDPFLOOD \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 60000 \
           -j RETURN
-$IPTABLES -A ANTI_UDPFLOOD -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES UDPFLOOD] : '
-$IPTABLES -A ANTI_UDPFLOOD -j DROP
-$IPTABLES -N FW_UDPFLOOD 2>/dev/null
-$IPTABLES -A FW_UDPFLOOD -i lo -j RETURN
-$IPTABLES -A FW_UDPFLOOD -o lo -j RETURN
-$IPTABLES -A FW_UDPFLOOD -o e+ -j RETURN
-$IPTABLES -A FW_UDPFLOOD -o p+ -j RETURN
-$IPTABLES -A FW_UDPFLOOD -o w+ -j RETURN
-$IPTABLES -A FW_UDPFLOOD -p udp -m state --state NEW -j ANTI_UDPFLOOD
+$IPTABLES -A ANTI_UDPFLOOD_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES UDPFLOOD] : '
+$IPTABLES -A ANTI_UDPFLOOD_ -j DROP
 $IPTABLES -A FIREWALL -j FW_UDPFLOOD && echo "FIREWALL	ANTI_UDPFLOOD"
 #
 # ICMPによる過大なアクセスをログを記録して破棄
+$IPTABLES -N FW_ICMPFLOOD 2>/dev/null
 $IPTABLES -N ANTI_ICMPFLOOD
-$IPTABLES -A ANTI_ICMPFLOOD \
+$IPTABLES -N ANTI_ICMPFLOOD_
+$IPTABLES -A FW_ICMPFLOOD -j ANTI_ICMPFLOOD
+$IPTABLES -A ANTI_ICMPFLOOD -i e+ -p icmp -j ANTI_ICMPFLOOD_
+$IPTABLES -A ANTI_ICMPFLOOD -i p+ -p icmp -j ANTI_ICMPFLOOD_
+$IPTABLES -A ANTI_ICMPFLOOD -i w+ -p icmp -j ANTI_ICMPFLOOD_
+$IPTABLES -A ANTI_ICMPFLOOD_ \
           -m hashlimit \
           --hashlimit-name icmp \
           --hashlimit 30/m \
@@ -670,21 +672,20 @@ $IPTABLES -A ANTI_ICMPFLOOD \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 60000 \
           -j RETURN
-$IPTABLES -A ANTI_ICMPFLOOD -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES ICMPFLOOD] : '
-$IPTABLES -A ANTI_ICMPFLOOD -j DROP
-$IPTABLES -N FW_ICMPFLOOD 2>/dev/null
-$IPTABLES -A FW_ICMPFLOOD -i lo -j RETURN
-$IPTABLES -A FW_ICMPFLOOD -o lo -j RETURN
-$IPTABLES -A FW_ICMPFLOOD -o e+ -j RETURN
-$IPTABLES -A FW_ICMPFLOOD -o p+ -j RETURN
-$IPTABLES -A FW_ICMPFLOOD -o w+ -j RETURN
-$IPTABLES -A FW_ICMPFLOOD -p icmp -j ANTI_ICMPFLOOD
+$IPTABLES -A ANTI_ICMPFLOOD_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES ICMPFLOOD] : '
+$IPTABLES -A ANTI_ICMPFLOOD_ -j DROP
 $IPTABLES -A FIREWALL -j FW_ICMPFLOOD && echo "FIREWALL	ANTI_ICMPFLOOD"
 
 # 管理用ポートへ3分間に10回を超えて接続試行をログを記録して破棄してNG
 # ※Brute Force攻撃対策
+$IPTABLES -N FW_BRUTEFORCE 2>/dev/null
 $IPTABLES -N ANTI_BRUTEFORCE
-$IPTABLES -A ANTI_BRUTEFORCE \
+$IPTABLES -N ANTI_BRUTEFORCE_
+$IPTABLES -A FW_BRUTEFORCE -p tcp -m multiport --dports $LOGIN -j ANTI_BRUTEFORCE
+$IPTABLES -A ANTI_BRUTEFORCE -i e+ -p tcp -m state --state NEW -j ANTI_BRUTEFORCE_
+$IPTABLES -A ANTI_BRUTEFORCE -i p+ -p tcp -m state --state NEW -j ANTI_BRUTEFORCE_
+$IPTABLES -A ANTI_BRUTEFORCE -i w+ -p tcp -m state --state NEW -j ANTI_BRUTEFORCE_
+$IPTABLES -A ANTI_BRUTEFORCE_ \
           -m hashlimit \
           --hashlimit-name bruteforce \
           --hashlimit 1/m \
@@ -692,16 +693,9 @@ $IPTABLES -A ANTI_BRUTEFORCE \
           --hashlimit-mode srcip \
           --hashlimit-htable-expire 180000 \
           -j RETURN
-$IPTABLES -A ANTI_BRUTEFORCE -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES BRUTEFORCE] : '
-$IPTABLES -A ANTI_BRUTEFORCE -j TRACK_PROWLER
-$IPTABLES -A ANTI_BRUTEFORCE -j DROP
-$IPTABLES -N FW_BRUTEFORCE 2>/dev/null
-$IPTABLES -A FW_BRUTEFORCE -i lo -j RETURN
-$IPTABLES -A FW_BRUTEFORCE -o lo -j RETURN
-$IPTABLES -A FW_BRUTEFORCE -o e+ -j RETURN
-$IPTABLES -A FW_BRUTEFORCE -o p+ -j RETURN
-$IPTABLES -A FW_BRUTEFORCE -o w+ -j RETURN
-$IPTABLES -A FW_BRUTEFORCE -p tcp -m multiport --dports $LOGIN -m state --syn --state NEW -j ANTI_BRUTEFORCE
+$IPTABLES -A ANTI_BRUTEFORCE_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES BRUTEFORCE] : '
+$IPTABLES -A ANTI_BRUTEFORCE_ -j TRACK_PROWLER
+$IPTABLES -A ANTI_BRUTEFORCE_ -j DROP
 $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL	ANTI_BRUTEFORCE"
 $IPTABLES -A FW_BASIC -j FW_BRUTEFORCE
 
@@ -934,15 +928,16 @@ $IPTABLES -D BLACKLIST_COUNTRY 1 2>/dev/null
 # ※公表サーバーでは無効にしてよい
 if [ $TRAP != false ]; then
     $IPTABLES -N TRAP_PORTSCAN
-    $IPTABLES -A TRAP_PORTSCAN -i lo -j RETURN
-    $IPTABLES -A TRAP_PORTSCAN -o lo -j RETURN
-    $IPTABLES -A TRAP_PORTSCAN -o e+ -j RETURN
-    $IPTABLES -A TRAP_PORTSCAN -o p+ -j RETURN
-    $IPTABLES -A TRAP_PORTSCAN -o w+ -j RETURN
-    $IPTABLES -A TRAP_PORTSCAN -j FW_BROADCAST
-    $IPTABLES -A TRAP_PORTSCAN -j FW_MULTICAST
-    $IPTABLES -A TRAP_PORTSCAN -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-    $IPTABLES -A TRAP_PORTSCAN -j TRACK_PROWLER
+    $IPTABLES -N ANTI_PORTSCAN
+    $IPTABLES -N ANTI_PORTSCAN_
+    $IPTABLES -A TRAP_PORTSCAN -j ANTI_PORTSCAN
+    $IPTABLES -A ANTI_PORTSCAN -i e+ -j ANTI_PORTSCAN_
+    $IPTABLES -A ANTI_PORTSCAN -i p+ -j ANTI_PORTSCAN_
+    $IPTABLES -A ANTI_PORTSCAN -i w+ -j ANTI_PORTSCAN_
+    $IPTABLES -A ANTI_PORTSCAN_ -j FW_BROADCAST
+    $IPTABLES -A ANTI_PORTSCAN_ -j FW_MULTICAST
+    $IPTABLES -A ANTI_PORTSCAN_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
+    $IPTABLES -A ANTI_PORTSCAN_ -j TRACK_PROWLER
     $IPTABLES -A INPUT -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"
     $IPTABLES -A FORWARD -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"
 fi
