@@ -9,8 +9,11 @@
 == config ==
   ROLES=(SSH)
   SSH=(BLOCK_COUNTRY "file{1,2}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|LOG...|DROP")
+  TRAP=(TRAP_PORTSCAN DROP)
   ...
-  $IPTABLES -A INPUT -p tcp --dport 60022 -j SSH
+  MAP=("${MAP[@]}" "INPUT -p tcp --dport 60022 -j SSH")
+  MAP=("${MAP[@]}" "INPUT -j TRAP_PORTSCAN")
+  MAP=("${MAP[@]}" "FORWARD -j TRAP_PORTSCAN")
 
 
 == apply ==
@@ -193,9 +196,6 @@ PREPROCESS="sh /etc/iptables/script/preprocess.sh"
 # /etc/iptables/preprocess.sh
 iptables -N CUSTOM_FILTER
 ```
-
-### TRAP
-ポートスキャントラップの使用を切り替える。
 
 ### SECURE
 国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。

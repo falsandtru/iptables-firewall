@@ -116,12 +116,13 @@ MAP=("${MAP[@]}" "INPUT -p tcp --dport 443 -j CUSTOMER")
 #MAP=("${MAP[@]}" "INPUT -p 51 -j AUTH")
 ## - Submission
 #MAP=("${MAP[@]}" "INPUT -p tcp --dport 587 -j PRIVATE")
+## TRAP
+## - PORTSCAN
+MAP=("${MAP[@]}" "INPUT -j TRAP_PORTSCAN")
+MAP=("${MAP[@]}" "FORWARD -j TRAP_PORTSCAN")
 
 # IP割り当て更新間隔(日)
 INTERVAL=7
-
-# ポートスキャントラップ
-TRAP=true
 
 # IPSの使用
 IDSIPS=
@@ -150,7 +151,6 @@ CACHE_DIR=/var/cache/iptables/
 echo "iptables firewall"
 
 # Default
-${TRAP:=false}
 ${SECURE:=false}
 
 # IPS/IDS
@@ -932,11 +932,6 @@ fi
 # 一時設定を削除
 $IPTABLES -D LOCAL_COUNTRY 1 2>/dev/null
 $IPTABLES -D BLOCK_COUNTRY 1 2>/dev/null
-
-if [ $TRAP != false ]; then
-    $IPTABLES -A INPUT -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"
-    $IPTABLES -A FORWARD -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"
-fi
 
 # POSTPROCESS
 echo "POSTPROCESS	$POSTPROCESS"
