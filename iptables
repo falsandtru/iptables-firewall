@@ -16,17 +16,31 @@
 # 管理用ポート番号
 LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 
+# 国別処理
+# - 許可 日本
+LOCAL_COUNTRY_CODE="JP"
+# - 拒否 中国|香港|マカオ|韓国|北朝鮮
+BLOCK_COUNTRY_CODE="CN|HK|MO|KR|KP"
+
+# ファイルデータ整形
+FORMAT="grep ^[0-9] | cut -d' ' -f1"
+
+# 事前処理/事後処理
+PREPROCESS=
+POSTPROCESS=
+
 # ロール
-ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC TEST)
+ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC BLACKLIST TEST)
 LOCAL=(IPS ACCEPT)
 CONNECTION=(FIREWALL IPS ACCEPT)
 SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
 NETWORK=(whitelist/network FIREWALL FW_INTRUDER IPS ACCEPT)
-AUTH=(whitelist/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-PRIVATE=("whitelist/{auth,user}|DROP" COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
+AUTH=(whitelist/auth LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
+PRIVATE=("whitelist/{auth,user}|DROP" LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
+CUSTOMER=(LOCAL_COUNTRY FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
-TEST=("whitelist/{auth,user}|TRACK_PROWLER|DROP" COUNTRY_FILTER FIERWALL FW_INTRUDER "IPS|DROP")
+BLACKLIST=(BLOCK_COUNTRY)
+TEST=("whitelist/{auth,user}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|DROP")
 
 # 適用
 MAP=()
@@ -39,6 +53,10 @@ MAP=("${MAP[@]}" "FORWARD -o lo -j LOCAL")
 MAP=("${MAP[@]}" "INPUT -m state --state ESTABLISHED,RELATED -j CONNECTION")
 MAP=("${MAP[@]}" "OUTPUT -m state --state NEW,ESTABLISHED -j CONNECTION")
 MAP=("${MAP[@]}" "FORWARD -m state --state ESTABLISHED,RELATED -j CONNECTION")
+## GLOBAL
+MAP=("${MAP[@]}" "INPUT -j BLACKLIST")
+MAP=("${MAP[@]}" "OUTPUT -j BLACKLIST")
+MAP=("${MAP[@]}" "FORWARD -j BLACKLIST")
 ## SYSTEM
 ## - ICMP
 MAP=("${MAP[@]}" "INPUT -p icmp --icmp-type destination-unreachable -j SYSTEM")
@@ -98,19 +116,6 @@ MAP=("${MAP[@]}" "INPUT -p tcp --dport 443 -j CUSTOMER")
 #MAP=("${MAP[@]}" "INPUT -p 51 -j AUTH")
 ## - Submission
 #MAP=("${MAP[@]}" "INPUT -p tcp --dport 587 -j PRIVATE")
-
-# ファイルデータ整形
-FORMAT="grep ^[0-9] | cut -d' ' -f1"
-
-# 事前処理/事後処理
-PREPROCESS=
-POSTPROCESS=
-
-# 許可 日本
-ACCEPT_COUNTRY_CODE="JP"
-
-# 拒否 中国|香港|マカオ|韓国|北朝鮮
-DROP_COUNTRY_CODE="CN|HK|MO|KR|KP"
 
 # IP割り当て更新間隔(日)
 INTERVAL=7
@@ -194,12 +199,12 @@ else
     $IPTABLES -F OUTPUT
     $IPTABLES -F FORWARD
     for CHAIN in `$IPTABLES -S | grep ^-N | cut -d" " -f2`; do
-        if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
+        if [ LOCAL_COUNTRY = $CHAIN ] || [ BLOCK_COUNTRY = $CHAIN ]; then continue;fi
         $IPTABLES -F $CHAIN
     done
 
     for CHAIN in `$IPTABLES -S | grep ^-N | cut -d" " -f2`; do
-        if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
+        if [ LOCAL_COUNTRY = $CHAIN ] || [ BLOCK_COUNTRY = $CHAIN ]; then continue;fi
         $IPTABLES -X $CHAIN
     done
 fi
@@ -209,8 +214,8 @@ $IPTABLES -P INPUT DROP
 $IPTABLES -P OUTPUT DROP
 $IPTABLES -P FORWARD DROP
 
-$IPTABLES -N COUNTRY_FILTER 2>/dev/null
-$IPTABLES -N BLACKLIST_COUNTRY 2>/dev/null
+$IPTABLES -N LOCAL_COUNTRY 2>/dev/null
+$IPTABLES -N BLOCK_COUNTRY 2>/dev/null
 
 $IPTABLES -N FIREWALL
 $IPTABLES -N FW_BASIC
@@ -224,11 +229,11 @@ $IPTABLES -N IDS
 
 # SECURE
 if [ $SECURE != false ]; then
-    $IPTABLES -I COUNTRY_FILTER -j DROP
-    $IPTABLES -I BLACKLIST_COUNTRY -j DROP
+    $IPTABLES -I LOCAL_COUNTRY -j DROP
+    $IPTABLES -I BLOCK_COUNTRY -j DROP
 else
-    $IPTABLES -I COUNTRY_FILTER -j ACCEPT
-    $IPTABLES -I BLACKLIST_COUNTRY -j ACCEPT
+    $IPTABLES -I LOCAL_COUNTRY -j ACCEPT
+    $IPTABLES -I BLOCK_COUNTRY -j ACCEPT
 fi
 
 # PREPROCESS
@@ -856,35 +861,31 @@ BUILD_COUNTRY_RULE(){
 BUILD_COUNTRY_RULE_ACCEPT(){
     local ADDR=$1
     local CIDR=$2
-    $IPTABLES -A COUNTRY_FILTER -s $ADDR/$CIDR -j RETURN
+    $IPTABLES -A LOCAL_COUNTRY -s $ADDR/$CIDR -j RETURN
 }
 BUILD_COUNTRY_RULE_DROP(){
     local ADDR=$1
     local CIDR=$2
-    $IPTABLES -A BLACKLIST_COUNTRY -s $ADDR/$CIDR -j DROP
+    $IPTABLES -A BLOCK_COUNTRY -s $ADDR/$CIDR -j DROP
 }
 
-if [ $RESET -ne 0 ] || [ ! -z "$ACCEPT_COUNTRY_CODE" -a $($IPTABLES -S COUNTRY_FILTER 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ ! -z "$DROP_COUNTRY_CODE" -a $($IPTABLES -S BLACKLIST_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
-    echo "BUILD		Chain COUNTRY_FILTER"
-    echo "BUILD		Chain BLACKLIST_COUNTRY"
+if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ] || [ ! -z "$BLOCK_COUNTRY_CODE" -a $($IPTABLES -S BLOCK_COUNTRY 2>/dev/null | awk 'END{print NR}') -le 2 ]; then
+    echo "BUILD		Chain LOCAL_COUNTRY"
+    echo "BUILD		Chain BLOCK_COUNTRY"
 
-    $IPTABLES -F COUNTRY_FILTER 2>/dev/null
-    $IPTABLES -F BLACKLIST_COUNTRY 2>/dev/null
+    $IPTABLES -F LOCAL_COUNTRY 2>/dev/null
+    $IPTABLES -F BLOCK_COUNTRY 2>/dev/null
 
-    BUILD_COUNTRY "delegated-apnic-extended-latest"   $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-arin-extended-latest"    $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-ripencc-extended-latest" $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
-    BUILD_COUNTRY "delegated-afrinic-extended-latest" $ACCEPT_COUNTRY_CODE $DROP_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-apnic-extended-latest"   $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-arin-extended-latest"    $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-ripencc-extended-latest" $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-lacnic-extended-latest"  $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
+    BUILD_COUNTRY "delegated-afrinic-extended-latest" $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
 
-    $IPTABLES -A COUNTRY_FILTER -j DROP
+    $IPTABLES -A LOCAL_COUNTRY -j DROP
 else
-    [ $ACCEPT_COUNTRY_CODE ] && echo "REUSE		Chain COUNTRY_FILTER"
-    [ $DROP_COUNTRY_CODE ] && echo "REUSE		Chain BLACKLIST_COUNTRY"
-fi
-
-if [ $DROP_COUNTRY_CODE ]; then
-    $IPTABLES -A PREFILTER -j BLACKLIST_COUNTRY
+    [ $LOCAL_COUNTRY_CODE ] && echo "REUSE		Chain LOCAL_COUNTRY"
+    [ $BLOCK_COUNTRY_CODE ] && echo "REUSE		Chain BLOCK_COUNTRY"
 fi
 
 
@@ -893,8 +894,8 @@ fi
 #----------------------------------------------------------#
 
 # 一時設定を削除
-$IPTABLES -D COUNTRY_FILTER 1 2>/dev/null
-$IPTABLES -D BLACKLIST_COUNTRY 1 2>/dev/null
+$IPTABLES -D LOCAL_COUNTRY 1 2>/dev/null
+$IPTABLES -D BLOCK_COUNTRY 1 2>/dev/null
 
 if [ $TRAP != false ]; then
     $IPTABLES -A INPUT -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"

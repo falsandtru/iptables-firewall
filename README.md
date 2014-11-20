@@ -2,13 +2,13 @@
 高機能iptables設定スクリプト。
 
 ```
-===================
-  SSH PACKET FLOW
-===================
+=======================
+  PACKET FLOW EXAMPLE
+=======================
 
 == config ==
   ROLES=(SSH)
-  SSH=("file{1,2}|TRACK_PROWLER|DROP" COUNTRY_FILTER FIERWALL FW_INTRUDER "IPS|LOG...|DROP")
+  SSH=(BLOCK_COUNTRY "file{1,2}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|LOG...|DROP")
   ...
   $IPTABLES -A INPUT -p tcp --dport 60022 -j SSH
 
@@ -21,19 +21,22 @@ INPUT  |               | TCP UDP ICMP                                  |
        |               |                                               |
        |====== | ======|===============================================|
        |====== V ======|===============================================|   _______
-Layer1 | Rule1         | Rule101       | Rule201       | Rule202       |  |       |
+Layer1 |                                                               |  |       |
+       |                          BLOCK_COUNTRY                       --->|       |
+       |______________________________ V ______________________________|  |       |
+Layer2 | Rule1         | Rule101       | Rule201       | Rule202       |  |       |
        |     file1    -->    file2    -->TRACK_PROWLER-->    DROP     --->|       |
-       |______ V ______|______ V ______|______ V ______|_______________|  |       |
-Layer2 |                                                               |  |       |
-       |                         COUNTRY_FILTER                       --->|       |
-       |______________________________ V ______________________________|  | BLOCK |
+       |______ V ______|______ V ______|______ V ______|_______________|  | BLOCK |
 Layer3 |                                                               |  |       |
-       |                            FIERWALL                          --->|       |
+       |                          LOCAL_COUNTRY                       --->|       |
        |______________________________ V ______________________________|  |       |
 Layer4 |                                                               |  |       |
+       |                            FIERWALL                          --->|       |
+       |______________________________ V ______________________________|  |       |
+Layer5 |                                                               |  |       |
        |                          FW_INTRUDER  ( -->  TRACK_PROWLER ) --->|       |
        |______________ V ______________________________________________|  |       |
-Layer5 |                               |               |               |  |       |
+Layer6 |                               |               |               |  |       |
        |            IDS/IPS           -->     LOG     -->     DROP    --->|       |
        |                               |               |               |  |       |
        |============== | ==============================================|  |_______|
@@ -80,12 +83,12 @@ IDSまたはIPSを使用する場合に設定する。
 ### ACCEPT_COUNTRY_CODE
 許可した国以外のIPからのパケットを破棄する。
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+国の設定を即座に更新するには既存のLOCAL_COUNTRYチェーンを初期化して再構築させる必要がある。
 
 ### DROP_COUNTRY_CODE
 拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+国の設定を即座に更新するには既存のLOCAL_COUNTRYチェーンを初期化して再構築させる必要がある。
 
 ### TRAP
 ポートスキャントラップの使用を切り替える。
@@ -130,7 +133,8 @@ Composite|他のタイプの組み合わせ。ROLENAME_FILENAMEを生成。
 
 Name|Description
 ----|-----------
-COUNTRY_FILTER|ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
+LOCAL_COUNTRY|LOCAL_COUNTRY_CODEで指定した国のIPのみ通過させる。
+BLOCK_COUNTRY|BLOCK_COUNTRY_CODEで指定した国のIPを破棄する。
 FIREWALL|不審なパケットを破棄し、そうでないパケットのみ通過させる。
 FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
@@ -141,11 +145,11 @@ ROLENAME_FILENAME|複数のチェーンを展開して結合する。名前の�
 
 ```sh
 # TESTロールにルールを設定
-TEST=(whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+TEST=(whitelist/private LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 # 1. whitelist/private
 # ファイルに記述されたIPのみ通過させ、ほかは遮断する。
 #
-# 2. COUNTRY_FILTER
+# 2. LOCAL_COUNTRY
 # 許可した国のIPのみ通過させ、ほかは遮断する。
 #
 # 3. FIREWALL
@@ -247,6 +251,9 @@ MIT License
 * MAPパラメータを追加
 * FORMATパラメータを追加
 * Compositeタイプルールを追加
+* 国別コードの設定パラメータを変更
+* 国別フィルタ名を変更
+* 拒否国の適用を手動に変更
 * BLACKLIST/WHITELIST機能を削除
 * ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
 * Firewallをリファクタリング
