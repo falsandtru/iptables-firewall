@@ -162,172 +162,6 @@ $IPTABLES -N IDS
 echo "PREPROCESS	$PREPROCESS"
 `$PREPROCESS`
 
-# ロールチェーン生成
-FILE_TO_CHAIN(){
-    local FILE=$1
-    local NAME=$2
-    if [ "`$IPTABLES -S | grep "^-N $NAME$"`" ]; then
-        return 0
-    elif [ ! -r $FILE ]; then
-        return 1
-    fi
-    $IPTABLES -N $NAME
-    $IPTABLES -F $NAME
-    local LINE
-    for LINE in `eval "cat $FILE | $FORMAT"`
-    do
-        $IPTABLES -A $NAME -s $LINE -j RETURN
-    done
-    return 0
-}
-BUILD_RULE(){
-    local RULE=$1
-    if [ `echo $RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
-        RULE=$RULE
-    elif [ "`$IPTABLES -S | grep "^\(-N $RULE$\|-P $RULE \)"`" ]; then
-        RULE=$RULE
-    elif [ `echo $RULE | grep -E ^[A-Z_]\+$` ]; then
-        $IPTABLES -N $RULE
-        [ $? -ne 0 ] && RULE=
-    else
-        local FILE=`echo $LIST_DIR$RULE | sed 's|.*//|/|'`
-        if [ -r $FILE ]; then
-            RULE=${RULE##*/}
-            RULE=`echo WL_$RULE | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
-            FILE_TO_CHAIN $FILE $RULE
-        else
-            RULE=
-            [ $SECURE = false ]
-        fi
-        [ $? -ne 0 ] && RULE=
-    fi
-    echo $RULE
-}
-BUILD_ROLE(){
-    local ROLE
-    local RULES
-    local RULE
-    for ROLE in ${ROLES[@]}; do
-        $IPTABLES -N $ROLE
-        eval RULES="\${${ROLE}[@]}"
-        local LINE=
-        for RULE in ${RULES[@]}; do
-            if [ ! "`echo $RULE | grep ,`" ]; then
-                RULE=`BUILD_RULE $RULE`
-                if [ ! $RULE ]; then continue; fi
-                $IPTABLES -A $ROLE -j $RULE
-                if [ `echo $RULE | grep ^WL_` ]; then
-                    $IPTABLES -A $RULE -j TRACK_PROWLER
-                    $IPTABLES -A $RULE -j DROP
-                fi
-                LINE="${LINE:+$LINE }$RULE"
-            else
-                local C_RULES=(`eval echo ${RULE//|/ }`)
-                local C_RULE
-                RULE=`echo ${ROLE}_${C_RULES[0]##*/} | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
-                $IPTABLES -N $RULE
-                LINE="${LINE:+$LINE }$RULE{"
-                for C_RULE in ${C_RULES[@]}; do
-                    C_RULE=`BUILD_RULE $C_RULE`
-                    if [ ! $C_RULE ]; then continue; fi
-                    LINE="$LINE$C_RULE,"
-                    if [ `echo $C_RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
-                        $IPTABLES -A $RULE -j $C_RULE
-                    elif [ `echo $C_RULE | grep ^WL_` ]; then
-                        for C_RULE in "`$IPTABLES -S ${C_RULE} | grep '^-A .* -s ' | sed -e 's/^-A[^-]*//'`"; do
-                            $IPTABLES -A $RULE $C_RULE
-                        done
-                    else
-                        for C_RULE in "`$IPTABLES -S ${C_RULE} | grep '^-A ' | sed -e 's/^-A[^-]*//'`"; do
-                            $IPTABLES -A $RULE $C_RULE
-                        done
-                    fi
-                done
-                LINE="${LINE%,}}"
-                if [ ! "`$IPTABLES -S $RULE | grep "^-A [^ ]\+ -j"`" ]; then
-                    $IPTABLES -A $RULE -j TRACK_PROWLER
-                    $IPTABLES -A $RULE -j DROP
-                fi
-                $IPTABLES -A $ROLE -j $RULE
-            fi
-        done
-        eval RULES="\${${ROLE}[@]}"
-        echo "ROLE_CONF	$ROLE[$(echo "${RULES[@]}")]"
-        echo "ROLE_APPL	$ROLE[$LINE]"
-    done
-}
-$IPTABLES -N TRACK_PROWLER
-BUILD_ROLE
-
-# SECURE
-if [ $SECURE != false ]; then
-    $IPTABLES -I COUNTRY_FILTER -j DROP
-    $IPTABLES -I BLACKLIST_COUNTRY -j DROP
-else
-    $IPTABLES -I COUNTRY_FILTER -j ACCEPT
-    $IPTABLES -I BLACKLIST_COUNTRY -j ACCEPT
-fi
-
-# ループバック(自身)のアクセスをすべて許可
-$IPTABLES -A INPUT -i lo -j LOCAL
-$IPTABLES -A OUTPUT -o lo -j LOCAL
-$IPTABLES -A FORWARD -i lo -j LOCAL
-$IPTABLES -A FORWARD -o lo -j LOCAL
-
-# 確立した接続を許可
-$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j KEEP
-$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j KEEP
-$IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j KEEP
-
-# 名前解決できるようにする
-NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
-for NAMESERVER in ${NAMESERVERS[@]}; do
-    $IPTABLES -A INPUT -s $NAMESERVER -p udp --dport 53 -j SYSTEM
-    $IPTABLES -A OUTPUT -d $NAMESERVER -p udp --sport 53 -j SYSTEM
-    $IPTABLES -A FORWARD -s $NAMESERVER -p udp --dport 53 -j SYSTEM
-    $IPTABLES -A FORWARD -d $NAMESERVER -p udp --sport 53 -j SYSTEM
-    echo "NAMESERVER	$NAMESERVER"
-done
-
-# NTPサーバと同期できるようにする
-NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}'))
-for NTPSERVER in ${NTPSERVERS[@]}; do
-    $IPTABLES -A INPUT -s $NTPSERVER -p udp --dport 123 -j SYSTEM
-    $IPTABLES -A OUTPUT -d $NTPSERVER -p udp --sport 123 -j SYSTEM
-    $IPTABLES -A FORWARD -s $NTPSERVER -p udp --dport 123 -j SYSTEM
-    $IPTABLES -A FORWARD -d $NTPSERVER -p udp --sport 123 -j SYSTEM
-    echo "NTPSERVER	$NTPSERVER"
-done
-
-
-#----------------------------------------------------------#
-# BLACKLIST/WHITELIST                                      #
-#----------------------------------------------------------#
-
-$IPTABLES -N PREFILTER
-
-$IPTABLES -A INPUT -j PREFILTER
-$IPTABLES -A FORWARD -j PREFILTER
-$IPTABLES -A OUTPUT -j PREFILTER
-
-# ホワイトリストに一致するIPをブラックリスト形式のフィルタから除外する
-LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
-if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
-    for LINE in `cat $LIST_FILE | grep ^[0-9]`
-    do
-        $IPTABLES -A PREFILTER -s $LINE -j RETURN
-    done
-fi
-
-# ブラックリストに一致するIPをDROPする
-LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
-if [ $BLACKLIST ] && [ -s $LIST_FILE ]; then
-    for LINE in `cat $LIST_FILE | grep ^[0-9]`
-    do
-        $IPTABLES -A PREFILTER -s $LINE -j DROP
-    done
-fi
-
 
 #----------------------------------------------------------#
 # Firewall                                                 #
@@ -699,6 +533,22 @@ $IPTABLES -A ANTI_BRUTEFORCE_ -j DROP
 $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL	ANTI_BRUTEFORCE"
 $IPTABLES -A FW_BASIC -j FW_BRUTEFORCE
 
+# 公開していないポートへのパケットをログを記録して破棄してNG
+# ※ポートスキャン対策
+# ※開けていないポートに1度でも触ったらアウト
+# ※公表サーバーでは無効にしてよい
+$IPTABLES -N TRAP_PORTSCAN
+$IPTABLES -N ANTI_PORTSCAN
+$IPTABLES -N ANTI_PORTSCAN_
+$IPTABLES -A TRAP_PORTSCAN -j ANTI_PORTSCAN
+$IPTABLES -A ANTI_PORTSCAN -i e+ -j ANTI_PORTSCAN_
+$IPTABLES -A ANTI_PORTSCAN -i p+ -j ANTI_PORTSCAN_
+$IPTABLES -A ANTI_PORTSCAN -i w+ -j ANTI_PORTSCAN_
+$IPTABLES -A ANTI_PORTSCAN_ -j FW_BROADCAST
+$IPTABLES -A ANTI_PORTSCAN_ -j FW_MULTICAST
+$IPTABLES -A ANTI_PORTSCAN_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
+$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_PROWLER
+
 
 #----------------------------------------------------------#
 # IDS/IPS                                                  #
@@ -727,6 +577,181 @@ if [ $IDSIPS = Snort ]; then
 
 else
     echo "IDS/IPS		DISABLE"
+fi
+
+
+#----------------------------------------------------------#
+# ROLE                                                     #
+#----------------------------------------------------------#
+
+FILE_TO_CHAIN(){
+    local FILE=$1
+    local NAME=$2
+    if [ "`$IPTABLES -S | grep "^-N $NAME$"`" ]; then
+        return 0
+    elif [ ! -r $FILE ]; then
+        return 1
+    fi
+    $IPTABLES -N $NAME
+    $IPTABLES -F $NAME
+    local ifs=$IFS
+    IFS=$'\n'
+    local LINE
+    for LINE in `eval "cat $FILE | $FORMAT"`
+    do
+        $IPTABLES -A $NAME -s $LINE -j RETURN
+    done
+    IFS=$ifs
+    return 0
+}
+BUILD_RULE(){
+    local RULE=$1
+    if [ `echo $RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
+        RULE=$RULE
+    elif [ "`$IPTABLES -S | grep "^\(-N $RULE$\|-P $RULE \)"`" ]; then
+        RULE=$RULE
+    elif [ `echo $RULE | grep -E ^[A-Z_]\+$` ]; then
+        $IPTABLES -N $RULE
+        [ $? -ne 0 ] && RULE=
+    else
+        local FILE=`echo $LIST_DIR$RULE | sed 's|.*//|/|'`
+        if [ -r $FILE ]; then
+            RULE=${RULE##*/}
+            RULE=`echo WL_$RULE | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
+            FILE_TO_CHAIN $FILE $RULE
+        else
+            RULE=
+            [ $SECURE = false ]
+        fi
+        [ $? -ne 0 ] && RULE=
+    fi
+    echo $RULE
+}
+BUILD_ROLE(){
+    local ROLE
+    local RULES
+    local RULE
+    for ROLE in ${ROLES[@]}; do
+        $IPTABLES -N $ROLE
+        eval RULES="\${${ROLE}[@]}"
+        local LINE=
+        for RULE in ${RULES[@]}; do
+            if [ ! "`echo $RULE | grep [,\|]`" ]; then
+                RULE=`BUILD_RULE $RULE`
+                if [ ! $RULE ]; then continue; fi
+                eval "$IPTABLES -A $ROLE -j $RULE"
+                if [ `echo $RULE | grep ^WL_` ]; then
+                    $IPTABLES -A $RULE -j TRACK_PROWLER
+                    $IPTABLES -A $RULE -j DROP
+                fi
+                LINE="${LINE:+$LINE }$RULE"
+            else
+                local C_RULES=(`eval echo ${RULE//|/ }`)
+                local C_RULE
+                RULE=`echo ${ROLE}_${C_RULES[0]##*/} | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
+                $IPTABLES -N $RULE
+                LINE="${LINE:+$LINE }$RULE{"
+                for C_RULE in ${C_RULES[@]}; do
+                    C_RULE=`BUILD_RULE $C_RULE`
+                    if [ ! $C_RULE ]; then continue; fi
+                    LINE="$LINE$C_RULE,"
+                    local ifs=$IFS
+                    IFS=$'\n'
+                    if [ `echo $C_RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
+                        eval "$IPTABLES -A $RULE -j $C_RULE"
+                    elif [ `echo $C_RULE | grep ^WL_` ]; then
+                        for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep ' -j RETURN' | sed -e 's/^-A[^-]*//'`; do
+                            eval "$IPTABLES -A $RULE $C_RULE"
+                        done
+                    else
+                        for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep '^-[AI] ' | sed -e 's/^-A[^-]*//'`; do
+                            eval "$IPTABLES -A $RULE $C_RULE"
+                        done
+                    fi
+                    IFS=$ifs
+                done
+                LINE="${LINE%,}}"
+                if [ ! "`$IPTABLES -S $RULE | grep "^-A [^ ]\+ -j"`" ]; then
+                    $IPTABLES -A $RULE -j TRACK_PROWLER
+                    $IPTABLES -A $RULE -j DROP
+                fi
+                $IPTABLES -A $ROLE -j $RULE
+            fi
+        done
+        eval RULES="\${${ROLE}[@]}"
+        echo "ROLE_CONF	$ROLE[$(echo "${RULES[@]}")]"
+        echo "ROLE_APPL	$ROLE[$LINE]"
+    done
+}
+BUILD_ROLE
+
+# SECURE
+if [ $SECURE != false ]; then
+    $IPTABLES -I COUNTRY_FILTER -j DROP
+    $IPTABLES -I BLACKLIST_COUNTRY -j DROP
+else
+    $IPTABLES -I COUNTRY_FILTER -j ACCEPT
+    $IPTABLES -I BLACKLIST_COUNTRY -j ACCEPT
+fi
+
+# ループバック(自身)のアクセスをすべて許可
+$IPTABLES -A INPUT -i lo -j LOCAL
+$IPTABLES -A OUTPUT -o lo -j LOCAL
+$IPTABLES -A FORWARD -i lo -j LOCAL
+$IPTABLES -A FORWARD -o lo -j LOCAL
+
+# 確立した接続を許可
+$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j KEEP
+$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED -j KEEP
+$IPTABLES -A FORWARD -m state --state ESTABLISHED,RELATED -j KEEP
+
+# 名前解決できるようにする
+NAMESERVERS=($(grep '^nameserver' /etc/resolv.conf | cut -d' ' -f2))
+for NAMESERVER in ${NAMESERVERS[@]}; do
+    $IPTABLES -A INPUT -s $NAMESERVER -p udp --dport 53 -j SYSTEM
+    $IPTABLES -A OUTPUT -d $NAMESERVER -p udp --sport 53 -j SYSTEM
+    $IPTABLES -A FORWARD -s $NAMESERVER -p udp --dport 53 -j SYSTEM
+    $IPTABLES -A FORWARD -d $NAMESERVER -p udp --sport 53 -j SYSTEM
+    echo "NAMESERVER	$NAMESERVER"
+done
+
+# NTPサーバと同期できるようにする
+NTPSERVERS=($(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}'))
+for NTPSERVER in ${NTPSERVERS[@]}; do
+    $IPTABLES -A INPUT -s $NTPSERVER -p udp --dport 123 -j SYSTEM
+    $IPTABLES -A OUTPUT -d $NTPSERVER -p udp --sport 123 -j SYSTEM
+    $IPTABLES -A FORWARD -s $NTPSERVER -p udp --dport 123 -j SYSTEM
+    $IPTABLES -A FORWARD -d $NTPSERVER -p udp --sport 123 -j SYSTEM
+    echo "NTPSERVER	$NTPSERVER"
+done
+
+
+#----------------------------------------------------------#
+# BLACKLIST/WHITELIST                                      #
+#----------------------------------------------------------#
+
+$IPTABLES -N PREFILTER
+
+$IPTABLES -A INPUT -j PREFILTER
+$IPTABLES -A FORWARD -j PREFILTER
+$IPTABLES -A OUTPUT -j PREFILTER
+
+# ホワイトリストに一致するIPをブラックリスト形式のフィルタから除外する
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
+if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
+    for LINE in `cat $LIST_FILE | grep ^[0-9]`
+    do
+        $IPTABLES -A PREFILTER -s $LINE -j RETURN
+    done
+fi
+
+# ブラックリストに一致するIPをDROPする
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
+if [ $BLACKLIST ] && [ -s $LIST_FILE ]; then
+    for LINE in `cat $LIST_FILE | grep ^[0-9]`
+    do
+        $IPTABLES -A PREFILTER -s $LINE -j DROP
+    done
 fi
 
 
@@ -922,22 +947,7 @@ $IPTABLES -A INPUT -p tcp --dport 443 -j CUSTOMER && echo "SERVICE		HTTPS[CUSTOM
 $IPTABLES -D COUNTRY_FILTER 1 2>/dev/null
 $IPTABLES -D BLACKLIST_COUNTRY 1 2>/dev/null
 
-# 公開していないポートへのパケットをログを記録して破棄してNG
-# ※ポートスキャン対策
-# ※開けていないポートに1度でも触ったらアウト
-# ※公表サーバーでは無効にしてよい
 if [ $TRAP != false ]; then
-    $IPTABLES -N TRAP_PORTSCAN
-    $IPTABLES -N ANTI_PORTSCAN
-    $IPTABLES -N ANTI_PORTSCAN_
-    $IPTABLES -A TRAP_PORTSCAN -j ANTI_PORTSCAN
-    $IPTABLES -A ANTI_PORTSCAN -i e+ -j ANTI_PORTSCAN_
-    $IPTABLES -A ANTI_PORTSCAN -i p+ -j ANTI_PORTSCAN_
-    $IPTABLES -A ANTI_PORTSCAN -i w+ -j ANTI_PORTSCAN_
-    $IPTABLES -A ANTI_PORTSCAN_ -j FW_BROADCAST
-    $IPTABLES -A ANTI_PORTSCAN_ -j FW_MULTICAST
-    $IPTABLES -A ANTI_PORTSCAN_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-    $IPTABLES -A ANTI_PORTSCAN_ -j TRACK_PROWLER
     $IPTABLES -A INPUT -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"
     $IPTABLES -A FORWARD -j TRAP_PORTSCAN && echo "FIREWALL	TRAP_PORTSCAN"
 fi
