@@ -49,6 +49,9 @@ PRIVATE=("whitelist/{auth,user}|DROP" COUNTRY_FILTER FIREWALL FW_INTRUDER IPS AC
 CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
 
+# ファイルデータ整形
+FORMAT="grep ^[0-9] | cut -d' ' -f1"
+
 # 事前処理/事後処理
 PREPROCESS=
 POSTPROCESS=
@@ -171,7 +174,7 @@ FILE_TO_CHAIN(){
     $IPTABLES -N $NAME
     $IPTABLES -F $NAME
     local LINE
-    for LINE in `cat $FILE | grep ^[0-9]`
+    for LINE in `eval "cat $FILE | $FORMAT"`
     do
         $IPTABLES -A $NAME -s $LINE -j RETURN
     done

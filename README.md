@@ -139,6 +139,9 @@ PREPROCESS="sh /etc/iptables/script/preprocess.sh"
 iptables -N CUSTOM_FILTER
 ```
 
+### FORMAT
+ファイルのデータを選択、整形する。
+
 ### PREPROCESS
 事前に実行するコマンドを設定する。
 
@@ -224,6 +227,7 @@ MIT License
 ### 0.5.3
 
 * Compositeタイプルールを追加
+* FORMATパラメータを追加
 * ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
 * 言語をshellからbashに変更
 
