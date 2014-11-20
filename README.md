@@ -66,7 +66,7 @@ ROLES=(TEST)
 $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 ```
 
-### RULES(LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
+### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
 既定のロールルール設定。ルールは左から順に適用される。
 ファイル、ユーザー定義チェーンおよびターゲット(ACCEPT/DROP/REJECT)を組み合わせて自由にルールを構築できる。
 最後のフィルタ(ルール)は通過させずパケットの処理を決定しなければならないため最後のルールにはターゲットを設定することが望ましい。
@@ -226,8 +226,9 @@ MIT License
 
 ### 0.5.3
 
-* Compositeタイプルールを追加
+* MAPパラメータを追加
 * FORMATパラメータを追加
+* Compositeタイプルールを追加
 * ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
 * Firewallをリファクタリング
 * 言語をshellからbashに変更
