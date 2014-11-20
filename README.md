@@ -1,6 +1,54 @@
 # iptables firewall
 高機能iptables設定スクリプト。
 
+```
+=======================
+  PACKET FLOW EXAMPLE
+=======================
+
+== config ==
+  ROLES=(SSH)
+  SSH=(BLOCK_COUNTRY "file{1,2}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|LOG...|DROP")
+  TRAP=(TRAP_PORTSCAN DROP)
+  ...
+  MAP=("${MAP[@]}" "INPUT -p tcp --dport 60022 -j SSH")
+  MAP=("${MAP[@]}" "INPUT -j TRAP_PORTSCAN")
+  MAP=("${MAP[@]}" "FORWARD -j TRAP_PORTSCAN")
+
+
+== apply ==
+            INTERNET
+        ______ V ______________________________________________________    _______
+INPUT  |               | TCP UDP ICMP                                  |  |       |
+       |   TCP 60022   |       TRAP_PORTSCAN  ( --> TRACK_PROWLER )   --->| POLICY|
+       |               |                                               |  |       |
+       |====== | ======|===============================================|  |_______|
+       |====== V ======|===============================================|   _______
+Layer1 |                                                               |  |       |
+       |                          BLOCK_COUNTRY                       --->|       |
+       |______________________________ V ______________________________|  |       |
+Layer2 | Rule1         | Rule101       | Rule201       | Rule202       |  |       |
+       |     file1    -->    file2    -->TRACK_PROWLER-->    DROP     --->|       |
+       |______ V ______|______ V ______|______ V ______|_______________|  | BLOCK |
+Layer3 |                                                               |  |       |
+       |                          LOCAL_COUNTRY                       --->|       |
+       |______________________________ V ______________________________|  |       |
+Layer4 |                                                               |  |       |
+       |                            FIERWALL                          --->|       |
+       |______________________________ V ______________________________|  |       |
+Layer5 |                                                               |  |       |
+       |                          FW_INTRUDER  ( --> TRACK_ATTACKER ) --->|       |
+       |______________ V ______________________________________________|  |       |
+Layer6 |                               |               |               |  |       |
+       |            IDS/IPS           -->     LOG     -->     DROP    --->|       |
+       |                               |               |               |  |       |
+       |============== | ==============================================|  |_______|
+       |============== V ==============================================|
+SERVICE|                                                               |
+       |                      === SSH SERVICE ===                      |
+       |_______________________________________________________________|
+```
+
 ## Feature
 
 * ロールベースコントロール
@@ -21,7 +69,7 @@ $ vi /etc/cron.daily/iptables
 > # Paste script.
 $ vi /etc/rsyslog.conf
 > kern.=debug /var/log/iptables.log
-$ sh /etc/cron.daily/iptables
+$ bash /etc/cron.daily/iptables
 ```
 
 ## Config
@@ -35,21 +83,24 @@ SSHなどのログインポートを設定。複数設定可。
 ### IDSIPS
 IDSまたはIPSを使用する場合に設定する。
 
-### ACCEPT_COUNTRY_CODE
+### LOCAL_COUNTRY_CODE
 許可した国以外のIPからのパケットを破棄する。
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+国の設定を即座に更新するには既存のLOCAL_COUNTRYチェーンを初期化して再構築させる必要がある。
 
-### DROP_COUNTRY_CODE
+### BLOCK_COUNTRY_CODE
 拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
 
-国の設定を即座に更新するには既存のCOUNTRY_FILTERチェーンを初期化して再構築させる必要がある。
+国の設定を即座に更新するには既存のLOCAL_COUNTRYチェーンを初期化して再構築させる必要がある。
 
-### TRAP
-ポートスキャントラップの使用を切り替える。
+### FORMAT
+ファイルのデータ行を選択、整形する。
 
-### SECURE
-国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
+### PREPROCESS
+事前に実行するコマンドを設定する。
+
+### POSTPROCESS
+事後に実行するコマンドを設定する。
 
 ### ROLES
 任意のロールを作成する。
@@ -66,38 +117,45 @@ ROLES=(TEST)
 $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 ```
 
-### RULES(LOCAL/KEEP/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
+### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC/BLACKLIST)
 既定のロールルール設定。ルールは左から順に適用される。
-ファイル、ユーザー定義チェーンおよびターゲット(ACCEPT/DROP/REJECT)を組み合わせて自由にルールを構築できる。
-最後のフィルタ(ルール)は通過させずパケットの処理を決定しなければならないため最後のルールにはターゲットを設定することが望ましい。
+
+ファイル、ユーザー定義チェーン、ジャンプターゲットおよびこれらをあらかじめ結合するフォーマットを組み合わせてルールを構築する。
+
+Compositeタイプによる複数のルールを結合した単一(単層)フィルタと、これを含む複数のルールを多段適用する積層構造の両方向でのフィルタ構築が可能。これにより多数のソースファイルとチェーンを組み合わせたフィルタを動的に構築可能。
+
+最後のルールは通過させずパケットの処理を決定しなければならないため最後のルールにはジャンプターゲットを設定することが望ましい。
 
 #### Type
 
 Type|Definition
 ----|----------
-Chain|大文字とアンダースコアの組み合わせまたは定義済みチェーン。
-Target|ターゲット。
-File|/etc/iptables/からの相対パスまたは絶対パス。
+Chain|大文字とアンダースコアの組み合わせによるチェーンの予約または定義済みチェーン。
+Target|ジャンプターゲット(ACCEPT/DROP/RETURN/REJECT/LOG/NFQUEUE)。
+File|/etc/iptables/からの相対パスまたは絶対パス。WL_FILENAMEを生成。
+Composite|他のタイプの組み合わせ。ROLENAME_FILENAMEを生成。
 
 #### Chain
 
 Name|Description
 ----|-----------
-COUNTRY_FILTER|ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる。
+LOCAL_COUNTRY|LOCAL_COUNTRY_CODEで指定した国のIPのみ通過させる。
+BLOCK_COUNTRY|BLOCK_COUNTRY_CODEで指定した国のIPを破棄する。
 FIREWALL|不審なパケットを破棄し、そうでないパケットのみ通過させる。
 FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
-WL_filename|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
+WL_FILENAME|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。名前の重複に注意。
+ROLENAME_FILENAME|複数のチェーンを展開して結合する。名前の重複に注意。
 
 #### Example
 
 ```sh
 # TESTロールにルールを設定
-TEST=(whitelist/private COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+TEST=(whitelist/private LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 # 1. whitelist/private
 # ファイルに記述されたIPのみ通過させ、ほかは遮断する。
 #
-# 2. COUNTRY_FILTER
+# 2. LOCAL_COUNTRY
 # 許可した国のIPのみ通過させ、ほかは遮断する。
 #
 # 3. FIREWALL
@@ -139,41 +197,8 @@ PREPROCESS="sh /etc/iptables/script/preprocess.sh"
 iptables -N CUSTOM_FILTER
 ```
 
-### PREPROCESS
-事前に実行するコマンドを設定する。
-
-### POSTPROCESS
-事後に実行するコマンドを設定する。
-
-### NAME SERVER
-自動設定。
-
-### NTP SERVER
-自動設定。
-
-### BLACKLIST
-グローバルブラックリスト。一致するIPを破棄する。/etc/iptables/からの相対パスまたは絶対パスで指定。
-
-```sh
-BLACKLIST=blacklist/global
-```
-
-```
-# BLACKLIST
-1.2.3.0/24
-```
-
-### WHITELIST
-グローバルホワイトリスト。一致するIPをBLACKLISTから除外する。/etc/iptables/からの相対パスまたは絶対パスで指定。
-
-```sh
-WHITELIST=whitelist/global
-```
-
-```
-# WHITELIST
-1.2.3.1
-```
+### SECURE
+国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
 
 ## IPv6 disable
 無効化せず放置した場合、IPv6のインターフェイスが攻撃し放題となる。
@@ -216,10 +241,26 @@ $ vi /etc/logrotate.d/iptables
 }
 ```
 
+## Environment
+CentOS 6.6
+
 ## License
 MIT License
 
 ## ChangeLog
+
+### 0.6.0
+
+* MAPパラメータを追加
+* FORMATパラメータを追加
+* Compositeタイプルールを追加
+* 国別コードの設定パラメータを変更
+* 国別フィルタ名を変更
+* 拒否国の適用を手動に変更
+* BLACKLIST/WHITELIST機能を削除
+* ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
+* Firewallをリファクタリング
+* 言語をshellからbashに変更
 
 ### 0.5.2
 
