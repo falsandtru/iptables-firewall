@@ -123,14 +123,16 @@ if [ $UPDATE -ne 0 ] && [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest
     $IPTABLES -X
 else
     RESET=0
-    for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+    $IPTABLES -F INPUT
+    $IPTABLES -F OUTPUT
+    $IPTABLES -F FORWARD
+    for CHAIN in `$IPTABLES -S | grep ^-N | cut -d" " -f2`; do
         if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
         $IPTABLES -F $CHAIN
     done
 
-    for CHAIN in `$IPTABLES -nL | grep ^Chain | cut -d " " -f 2`; do
+    for CHAIN in `$IPTABLES -S | grep ^-N | cut -d" " -f2`; do
         if [ COUNTRY_FILTER = $CHAIN ] || [ BLACKLIST_COUNTRY = $CHAIN ]; then continue;fi
-        if [ INPUT = $CHAIN ] || [ FORWARD = $CHAIN ] || [ OUTPUT = $CHAIN ]; then continue;fi
         $IPTABLES -X $CHAIN
     done
 fi
@@ -234,7 +236,7 @@ $IPTABLES -A FORWARD -j PREFILTER
 $IPTABLES -A OUTPUT -j PREFILTER
 
 # ホワイトリストに一致するIPをブラックリスト形式のフィルタから除外する
-LIST_FILE=`echo $LIST_DIR$WHITELIST | sed 's|.*//|/|'`
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
 if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
     for LINE in `cat $LIST_FILE | grep ^[0-9]`
     do
@@ -243,7 +245,7 @@ if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
 fi
 
 # ブラックリストに一致するIPをDROPする
-LIST_FILE=`echo $LIST_DIR$WHITELIST | sed 's|.*//|/|'`
+LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
 if [ $BLACKLIST ] && [ -s $LIST_FILE ]; then
     for LINE in `cat $LIST_FILE | grep ^[0-9]`
     do
