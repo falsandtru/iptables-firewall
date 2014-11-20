@@ -325,6 +325,10 @@ $IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-rapid --update --rttl -j AN
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-rapid --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-fast --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-medium --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-slow --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
 $IPTABLES -A ANTI_INTRUDER__ -j DROP
 #$IPTABLES -A FIREWALL -j FW_INTRUDER && echo "FIREWALL	ANTI_INTRUDER"
@@ -338,7 +342,7 @@ $IPTABLES -A ANTI_INTRUDER__ -j DROP
 # $ cat /sys/module/xt_recent/parameters/ip_list_tot
 # $ ls /proc/net/xt_recent/
 
-# 不審なアクセスを行っているIPをスパイとして記録
+# 不審なアクセスを行っているIPを不審者として記録
 # ※不審なアクセスを長時間追跡する
 # ※正規の通信のフィルタとして使用不可
 # ※公表サーバーでは無効にしてよい
@@ -372,6 +376,38 @@ $IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-medium --set
 #$IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-slow --update --rttl --seconds 86400 -j RETURN
 $IPTABLES -A ANTI_PROWLER_ -m recent --name prowler-slow --set
 
+# 攻撃を行っているIPを攻撃者として記録
+# ※TRACK_PROWLERに同じ
+$IPTABLES -N TRACK_ATTACKER 2>/dev/null
+$IPTABLES -N ANTI_ATTACKER
+$IPTABLES -N ANTI_ATTACKER_
+$IPTABLES -A TRACK_ATTACKER -j ANTI_ATTACKER
+$IPTABLES -A ANTI_ATTACKER -i e+ -j ANTI_ATTACKER_
+$IPTABLES -A ANTI_ATTACKER -i p+ -j ANTI_ATTACKER_
+$IPTABLES -A ANTI_ATTACKER -i w+ -j ANTI_ATTACKER_
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-rapid --update --rttl --seconds 10 -j RETURN
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-rapid --set
+$IPTABLES -A ANTI_ATTACKER_ \
+          -m hashlimit \
+          --hashlimit-name attacker-rapid \
+          --hashlimit-above 6/m \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 10000 \
+          -j RETURN
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-fast --update --rttl --seconds 60 -j RETURN
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-fast --set
+$IPTABLES -A ANTI_ATTACKER_ \
+          -m hashlimit \
+          --hashlimit-name attacker-fast \
+          --hashlimit-above 1/m \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 60000 \
+          -j RETURN
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-medium --update --rttl --seconds 3600 -j RETURN
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-medium --set
+#$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-slow --update --rttl --seconds 86400 -j RETURN
+$IPTABLES -A ANTI_ATTACKER_ -m recent --name attacker-slow --set
+
 # 外部とのNetBIOS関連のアクセスはログを記録せずに破棄してNG
 $IPTABLES -N FW_NETBIOS 2>/dev/null
 $IPTABLES -N DENY_NETBIOS
@@ -382,7 +418,7 @@ $IPTABLES -A FW_NETBIOS -i w+ -j DENY_NETBIOS
 $IPTABLES -A DENY_NETBIOS -p tcp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS_
 $IPTABLES -A DENY_NETBIOS -p udp -m multiport --dports 135,137,138,139,445 -j DENY_NETBIOS_
 $IPTABLES -A DENY_NETBIOS_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES NETBIOS] : '
-$IPTABLES -A DENY_NETBIOS_ -j TRACK_PROWLER
+$IPTABLES -A DENY_NETBIOS_ -j TRACK_ATTACKER
 $IPTABLES -A DENY_NETBIOS_ -j DROP
 $IPTABLES -A FIREWALL -j FW_NETBIOS && echo "FIREWALL	DENY_NETBIOS"
 $IPTABLES -A FW_BASIC -j FW_NETBIOS
@@ -396,7 +432,7 @@ $IPTABLES -A FW_FRAGMENT -i p+ -j DENY_FRAGMENT
 $IPTABLES -A FW_FRAGMENT -i w+ -j DENY_FRAGMENT
 $IPTABLES -A DENY_FRAGMENT -f -j DENY_FRAGMENT_
 $IPTABLES -A DENY_FRAGMENT_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES FRAGMENT] : '
-$IPTABLES -A DENY_FRAGMENT_ -j TRACK_PROWLER
+$IPTABLES -A DENY_FRAGMENT_ -j TRACK_ATTACKER
 $IPTABLES -A DENY_FRAGMENT_ -j DROP
 $IPTABLES -A FIREWALL -j FW_FRAGMENT && echo "FIREWALL	DENY_FRAGMENT"
 
@@ -427,7 +463,7 @@ $IPTABLES -A ANTI_SPOOFING_ -s 10.0.0.0/8     -j ANTI_SPOOFING__
 $IPTABLES -A ANTI_SPOOFING_ -s 172.16.0.0/12  -j ANTI_SPOOFING__
 $IPTABLES -A ANTI_SPOOFING_ -s 192.168.0.0/16 -j ANTI_SPOOFING__
 $IPTABLES -A ANTI_SPOOFING__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES SPOOFING] : '
-$IPTABLES -A ANTI_SPOOFING__ -j TRACK_PROWLER
+$IPTABLES -A ANTI_SPOOFING__ -j TRACK_ATTACKER
 $IPTABLES -A ANTI_SPOOFING__ -j DROP
 $IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL	ANTI_SPOOFING"
 $IPTABLES -A FW_BASIC -j FW_SPOOFING
@@ -472,7 +508,7 @@ $IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL FIN,PSH,URG -j ANTI_STEALT
 $IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j ANTI_STEALTHSCAN__
 $IPTABLES -A ANTI_STEALTHSCAN_ -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG,PSH -j ANTI_STEALTHSCAN__
 $IPTABLES -A ANTI_STEALTHSCAN__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES STEALTHSCAN] : '
-$IPTABLES -A ANTI_STEALTHSCAN__ -j TRACK_PROWLER
+$IPTABLES -A ANTI_STEALTHSCAN__ -j TRACK_ATTACKER
 $IPTABLES -A ANTI_STEALTHSCAN__ -j DROP
 #$IPTABLES -A FIREWALL -j FW_STEALTHSCAN && echo "FIREWALL	ANTI_STEALTHSCAN"
 
@@ -494,7 +530,7 @@ $IPTABLES -A ANTI_PINGDEATH_ \
           --hashlimit-htable-expire 1000 \
           -j RETURN
 $IPTABLES -A ANTI_PINGDEATH_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PINGDEATH] : '
-$IPTABLES -A ANTI_PINGDEATH_ -j TRACK_PROWLER
+$IPTABLES -A ANTI_PINGDEATH_ -j TRACK_ATTACKER
 $IPTABLES -A ANTI_PINGDEATH_ -j DROP
 $IPTABLES -A FIREWALL -j FW_PINGDEATH && echo "FIREWALL	ANTI_PINGDEATH"
 
@@ -606,7 +642,7 @@ $IPTABLES -A ANTI_BRUTEFORCE_ \
           --hashlimit-htable-expire 180000 \
           -j RETURN
 $IPTABLES -A ANTI_BRUTEFORCE_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES BRUTEFORCE] : '
-$IPTABLES -A ANTI_BRUTEFORCE_ -j TRACK_PROWLER
+$IPTABLES -A ANTI_BRUTEFORCE_ -j TRACK_ATTACKER
 $IPTABLES -A ANTI_BRUTEFORCE_ -j DROP
 $IPTABLES -A FIREWALL -j FW_BRUTEFORCE && echo "FIREWALL	ANTI_BRUTEFORCE"
 $IPTABLES -A FW_BASIC -j FW_BRUTEFORCE
@@ -625,7 +661,7 @@ $IPTABLES -A ANTI_PORTSCAN -i w+ -j ANTI_PORTSCAN_
 $IPTABLES -A ANTI_PORTSCAN_ -j FW_BROADCAST
 $IPTABLES -A ANTI_PORTSCAN_ -j FW_MULTICAST
 $IPTABLES -A ANTI_PORTSCAN_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_PROWLER
+$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_ATTACKER
 
 
 #----------------------------------------------------------#
