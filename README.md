@@ -21,7 +21,7 @@ $ vi /etc/cron.daily/iptables
 > # Paste script.
 $ vi /etc/rsyslog.conf
 > kern.=debug /var/log/iptables.log
-$ sh /etc/cron.daily/iptables
+$ bash /etc/cron.daily/iptables
 ```
 
 ## Config
@@ -225,6 +225,7 @@ MIT License
 
 * Compositeタイプルールを追加
 * ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
+* 言語をshellからbashに変更
 
 ### 0.5.2
 
