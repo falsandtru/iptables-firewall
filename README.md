@@ -80,21 +80,24 @@ SSHなどのログインポートを設定。複数設定可。
 ### IDSIPS
 IDSまたはIPSを使用する場合に設定する。
 
-### ACCEPT_COUNTRY_CODE
+### LOCAL_COUNTRY_CODE
 許可した国以外のIPからのパケットを破棄する。
 
 国の設定を即座に更新するには既存のLOCAL_COUNTRYチェーンを初期化して再構築させる必要がある。
 
-### DROP_COUNTRY_CODE
+### BLOCK_COUNTRY_CODE
 拒否した国のIPからのパケットを破棄する。性能が1/2から1/10程度に劣化するため注意が必要。
 
 国の設定を即座に更新するには既存のLOCAL_COUNTRYチェーンを初期化して再構築させる必要がある。
 
-### TRAP
-ポートスキャントラップの使用を切り替える。
+### FORMAT
+ファイルのデータ行を選択、整形する。
 
-### SECURE
-国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
+### PREPROCESS
+事前に実行するコマンドを設定する。
+
+### POSTPROCESS
+事後に実行するコマンドを設定する。
 
 ### ROLES
 任意のロールを作成する。
@@ -111,7 +114,7 @@ ROLES=(TEST)
 $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 ```
 
-### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
+### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC/BLACKLIST)
 既定のロールルール設定。ルールは左から順に適用される。
 
 ファイル、ユーザー定義チェーン、ジャンプターゲットおよびこれらをあらかじめ結合するフォーマットを組み合わせてルールを構築する。
@@ -191,14 +194,11 @@ PREPROCESS="sh /etc/iptables/script/preprocess.sh"
 iptables -N CUSTOM_FILTER
 ```
 
-### FORMAT
-ファイルのデータを選択、整形する。
+### TRAP
+ポートスキャントラップの使用を切り替える。
 
-### PREPROCESS
-事前に実行するコマンドを設定する。
-
-### POSTPROCESS
-事後に実行するコマンドを設定する。
+### SECURE
+国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
 
 ## IPv6 disable
 無効化せず放置した場合、IPv6のインターフェイスが攻撃し放題となる。
@@ -241,12 +241,15 @@ $ vi /etc/logrotate.d/iptables
 }
 ```
 
+## Environment
+CentOS 6.6
+
 ## License
 MIT License
 
 ## ChangeLog
 
-### 0.5.3
+### 0.6.0
 
 * MAPパラメータを追加
 * FORMATパラメータを追加
