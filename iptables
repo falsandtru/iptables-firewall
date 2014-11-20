@@ -130,7 +130,7 @@ IDSIPS=
 # 厳格更新
 SECURE=
 
-# ログの最大生成間隔
+# ログの最大生成速度
 LOG_LIMIT=60/m
 LOG_LIMIT_BURST=1000
 
@@ -750,14 +750,11 @@ BUILD_ROLE(){
         eval RULES="\${${ROLE}[@]}"
         local LINE=
         for RULE in ${RULES[@]}; do
+            local AS_WHITELIST=
             if [ ! "`echo $RULE | grep [,\|]`" ]; then
                 RULE=`BUILD_RULE $RULE`
                 if [ ! $RULE ]; then continue; fi
-                eval "$IPTABLES -A $ROLE -j $RULE"
-                if [ `echo $RULE | grep ^WL_` ]; then
-                    $IPTABLES -A $RULE -j TRACK_PROWLER
-                    $IPTABLES -A $RULE -j DROP
-                fi
+                AS_WHITELIST=`echo $RULE | grep ^WL_`
                 LINE="${LINE:+$LINE }$RULE"
             else
                 local C_RULES=(`eval echo ${RULE//|/ }`)
@@ -767,17 +764,21 @@ BUILD_ROLE(){
                 LINE="${LINE:+$LINE }$RULE("
                 for C_RULE in ${C_RULES[@]}; do
                     C_RULE=`BUILD_RULE $C_RULE`
+                    AS_WHITELIST=
                     if [ ! $C_RULE ]; then continue; fi
                     LINE="$LINE$C_RULE,"
                     local ifs=$IFS
                     IFS=$'\n'
                     if [ `echo $C_RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
+                        AS_WHITELIST=${AS_WHITELIST:+}
                         eval "$IPTABLES -A $RULE -j $C_RULE"
                     elif [ `echo $C_RULE | grep ^WL_` ]; then
+                        AS_WHITELIST=${AS_WHITELIST:-1}
                         for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep ' -j RETURN' | sed -e 's/^-A[^-]*//'`; do
                             eval "$IPTABLES -A $RULE $C_RULE"
                         done
                     else
+                        AS_WHITELIST=${AS_WHITELIST:+}
                         for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep '^-[AI] ' | sed -e 's/^-A[^-]*//'`; do
                             eval "$IPTABLES -A $RULE $C_RULE"
                         done
@@ -785,11 +786,11 @@ BUILD_ROLE(){
                     IFS=$ifs
                 done
                 LINE="${LINE%,})"
-                if [ ! "`$IPTABLES -S $RULE | grep "^-A [^ ]\+ -j"`" ]; then
-                    $IPTABLES -A $RULE -j TRACK_PROWLER
-                    $IPTABLES -A $RULE -j DROP
-                fi
-                $IPTABLES -A $ROLE -j $RULE
+            fi
+            eval "$IPTABLES -A $ROLE -j $RULE"
+            if [ $AS_WHITELIST ]; then
+                $IPTABLES -A $RULE -j TRACK_PROWLER
+                $IPTABLES -A $RULE -j DROP
             fi
         done
         eval RULES="\${${ROLE}[@]}"

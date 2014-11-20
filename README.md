@@ -131,8 +131,8 @@ Type|Definition
 ----|----------
 Chain|大文字とアンダースコアの組み合わせによるチェーンの予約または定義済みチェーン。
 Target|ジャンプターゲット(ACCEPT/DROP/RETURN/REJECT/LOG/NFQUEUE)。
-File|/etc/iptables/からの相対パスまたは絶対パス。WL_FILENAMEを生成。
-Composite|他のタイプの組み合わせ。ROLENAME_FILENAMEを生成。
+File|/etc/iptables/からの相対パスまたは絶対パス。WL_FILENAMEチェーンを生成。
+Composite|他のタイプの組み合わせ。ROLENAME_FILENAMEチェーンを生成。ファイルのみで構成した場合はホワイトリストフィルタとなる。
 
 #### Chain
 
@@ -140,11 +140,13 @@ Name|Description
 ----|-----------
 LOCAL_COUNTRY|LOCAL_COUNTRY_CODEで指定した国のIPのみ通過させる。
 BLOCK_COUNTRY|BLOCK_COUNTRY_CODEで指定した国のIPを破棄する。
-FIREWALL|不審なパケットを破棄し、そうでないパケットのみ通過させる。
+FIREWALL|攻撃または不審なパケットを破棄し、そうでないパケットのみ通過させる。
 FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
-WL_FILENAME|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。名前の重複に注意。
-ROLENAME_FILENAME|複数のチェーンを展開して結合する。名前の重複に注意。
+WL_FILENAME|ファイルタイプのルールから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
+ROLENAME_FILENAME|複合タイプのルールにより生成されるフィルタ。
+
+※ 動的に生成されるフィルタは名前の重複に注意。
 
 #### Example
 
@@ -247,6 +249,10 @@ CentOS 6.6
 MIT License
 
 ## ChangeLog
+
+### 0.6.1
+
+* Compositeタイプのホワイトリストモードを修正
 
 ### 0.6.0
 
