@@ -196,36 +196,6 @@ iptables -N CUSTOM_FILTER
 ### POSTPROCESS
 事後に実行するコマンドを設定する。
 
-### NAME SERVER
-自動設定。
-
-### NTP SERVER
-自動設定。
-
-### BLACKLIST
-グローバルブラックリスト。一致するIPを破棄する。/etc/iptables/からの相対パスまたは絶対パスで指定。
-
-```sh
-BLACKLIST=blacklist/global
-```
-
-```
-# BLACKLIST
-1.2.3.0/24
-```
-
-### WHITELIST
-グローバルホワイトリスト。一致するIPをBLACKLISTから除外する。/etc/iptables/からの相対パスまたは絶対パスで指定。
-
-```sh
-WHITELIST=whitelist/global
-```
-
-```
-# WHITELIST
-1.2.3.1
-```
-
 ## IPv6 disable
 無効化せず放置した場合、IPv6のインターフェイスが攻撃し放題となる。
 
@@ -277,6 +247,7 @@ MIT License
 * MAPパラメータを追加
 * FORMATパラメータを追加
 * Compositeタイプルールを追加
+* BLACKLIST/WHITELIST機能を削除
 * ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
 * Firewallをリファクタリング
 * 言語をshellからbashに変更

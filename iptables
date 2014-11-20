@@ -124,10 +124,6 @@ IDSIPS=
 # 厳格更新
 SECURE=
 
-# ブラックリスト/ホワイトリスト
-BLACKLIST=
-WHITELIST=
-
 # ログの最大生成間隔
 LOG_LIMIT=60/m
 LOG_LIMIT_BURST=1000
@@ -777,34 +773,6 @@ MAPPING(){
     IFS=$ifs
 }
 MAPPING
-
-#----------------------------------------------------------#
-# BLACKLIST/WHITELIST                                      #
-#----------------------------------------------------------#
-
-$IPTABLES -N PREFILTER
-
-$IPTABLES -A INPUT -j PREFILTER
-$IPTABLES -A FORWARD -j PREFILTER
-$IPTABLES -A OUTPUT -j PREFILTER
-
-# ホワイトリストに一致するIPをブラックリスト形式のフィルタから除外する
-LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
-if [ $WHITELIST ] && [ -s $LIST_FILE ]; then
-    for LINE in `cat $LIST_FILE | grep ^[0-9]`
-    do
-        $IPTABLES -A PREFILTER -s $LINE -j RETURN
-    done
-fi
-
-# ブラックリストに一致するIPをDROPする
-LIST_FILE=`echo $LIST_DIR$WHITELIST | sed -e 's|.*//|/|'`
-if [ $BLACKLIST ] && [ -s $LIST_FILE ]; then
-    for LINE in `cat $LIST_FILE | grep ^[0-9]`
-    do
-        $IPTABLES -A PREFILTER -s $LINE -j DROP
-    done
-fi
 
 
 #----------------------------------------------------------#
