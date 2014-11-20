@@ -30,7 +30,7 @@ PREPROCESS=
 POSTPROCESS=
 
 # ロール
-ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC BLACKLIST TEST)
+ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC TEST)
 LOCAL=(IPS ACCEPT)
 CONNECTION=(FIREWALL IPS ACCEPT)
 SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
@@ -39,11 +39,9 @@ AUTH=(whitelist/auth LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 PRIVATE=("whitelist/{auth,user}|DROP" LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 CUSTOMER=(LOCAL_COUNTRY FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
-BLACKLIST=(BLOCK_COUNTRY)
 TEST=("whitelist/{auth,user}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|DROP")
 
 # 適用
-MAP=()
 ## LOCAL
 MAP=("${MAP[@]}" "INPUT -i lo -j LOCAL")
 MAP=("${MAP[@]}" "OUTPUT -o lo -j LOCAL")
@@ -54,9 +52,9 @@ MAP=("${MAP[@]}" "INPUT -m state --state ESTABLISHED,RELATED -j CONNECTION")
 MAP=("${MAP[@]}" "OUTPUT -m state --state NEW,ESTABLISHED -j CONNECTION")
 MAP=("${MAP[@]}" "FORWARD -m state --state ESTABLISHED,RELATED -j CONNECTION")
 ## GLOBAL
-MAP=("${MAP[@]}" "INPUT -j BLACKLIST")
-MAP=("${MAP[@]}" "OUTPUT -j BLACKLIST")
-MAP=("${MAP[@]}" "FORWARD -j BLACKLIST")
+MAP=("${MAP[@]}" "INPUT -j BLOCK_COUNTRY")
+MAP=("${MAP[@]}" "OUTPUT -j BLOCK_COUNTRY")
+MAP=("${MAP[@]}" "FORWARD -j BLOCK_COUNTRY")
 ## SYSTEM
 ## - ICMP
 MAP=("${MAP[@]}" "INPUT -p icmp --icmp-type destination-unreachable -j SYSTEM")
@@ -774,12 +772,12 @@ BUILD_ROLE(){
                         eval "$IPTABLES -A $RULE -j $C_RULE"
                     elif [ `echo $C_RULE | grep ^WL_` ]; then
                         AS_WHITELIST=${AS_WHITELIST:-1}
-                        for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep ' -j RETURN' | sed -e 's/^-A[^-]*//'`; do
+                        for C_RULE in `$IPTABLES -S ${C_RULE} | grep ' -j RETURN' | sed -e 's/^-A[^-]*//'`; do
                             eval "$IPTABLES -A $RULE $C_RULE"
                         done
                     else
                         AS_WHITELIST=${AS_WHITELIST:+}
-                        for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep '^-[AI] ' | sed -e 's/^-A[^-]*//'`; do
+                        for C_RULE in `$IPTABLES -S ${C_RULE} | grep '^-[AI] ' | sed -e 's/^-A[^-]*//'`; do
                             eval "$IPTABLES -A $RULE $C_RULE"
                         done
                     fi
@@ -911,8 +909,8 @@ if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUN
     echo "BUILD		Chain LOCAL_COUNTRY"
     echo "BUILD		Chain BLOCK_COUNTRY"
 
-    $IPTABLES -F LOCAL_COUNTRY 2>/dev/null
-    $IPTABLES -F BLOCK_COUNTRY 2>/dev/null
+    $IPTABLES -F LOCAL_COUNTRY
+    $IPTABLES -F BLOCK_COUNTRY
 
     BUILD_COUNTRY "delegated-apnic-extended-latest"   $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
     BUILD_COUNTRY "delegated-arin-extended-latest"    $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE

@@ -116,7 +116,7 @@ ROLES=(TEST)
 $IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
 ```
 
-### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC/BLACKLIST)
+### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
 既定のロールルール設定。ルールは左から順に適用される。
 
 ファイル、ユーザー定義チェーン、ジャンプターゲットおよびこれらをあらかじめ結合するフォーマットを組み合わせてルールを構築する。
