@@ -810,6 +810,7 @@ MAPPING(){
     IFS=$'\n'
     for PARAM in ${MAP[@]}; do
         eval "$IPTABLES -A $PARAM"
+        echo "MAP		$PARAM"
     done
     IFS=$ifs
 }
