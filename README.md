@@ -76,12 +76,6 @@ $ bash /etc/cron.daily/iptables
 ### LOGIN
 SSHなどのログインポートを設定。複数設定可。
 
-### INTERVAL
-地域レジストリから取得するIP割り当ての更新間隔。
-
-### IDSIPS
-IDSまたはIPSを使用する場合に設定する。
-
 ### LOCAL_COUNTRY_CODE
 許可した国以外のIPからのパケットを破棄する。
 
@@ -113,10 +107,10 @@ ROLES=(TEST)
 
 ```sh
 # TESTロールを適用
-$IPTABLES -A INPUT -p tcp --dport 8080 -j TEST
+MAP=("${MAP[@]}" "INPUT -p tcp --dport 80 -j TEST")
 ```
 
-### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC/BLACKLIST)
+### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
 既定のロールルール設定。ルールは左から順に適用される。
 
 ファイル、ユーザー定義チェーン、ジャンプターゲットおよびこれらをあらかじめ結合するフォーマットを組み合わせてルールを構築する。
@@ -131,8 +125,8 @@ Type|Definition
 ----|----------
 Chain|大文字とアンダースコアの組み合わせによるチェーンの予約または定義済みチェーン。
 Target|ジャンプターゲット(ACCEPT/DROP/RETURN/REJECT/LOG/NFQUEUE)。
-File|/etc/iptables/からの相対パスまたは絶対パス。WL_FILENAMEを生成。
-Composite|他のタイプの組み合わせ。ROLENAME_FILENAMEを生成。
+File|/etc/iptables/からの相対パスまたは絶対パス。WL_FILENAMEチェーンを生成。ファイル名を識別子とするためファイルは重複しない固有の名前でなければならない。
+Composite|他のタイプの組み合わせ。ROLENAME_ITEMNAMEチェーンを生成。先頭の要素名をロール内の識別子とするためこの名前がロール内で重複してはならない。ファイルのみで構成した場合はホワイトリストフィルタとして動作する。
 
 #### Chain
 
@@ -140,11 +134,13 @@ Name|Description
 ----|-----------
 LOCAL_COUNTRY|LOCAL_COUNTRY_CODEで指定した国のIPのみ通過させる。
 BLOCK_COUNTRY|BLOCK_COUNTRY_CODEで指定した国のIPを破棄する。
-FIREWALL|不審なパケットを破棄し、そうでないパケットのみ通過させる。
+FIREWALL|攻撃または不審なパケットを破棄し、そうでないパケットのみ通過させる。
 FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
-WL_FILENAME|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。名前の重複に注意。
-ROLENAME_FILENAME|複数のチェーンを展開して結合する。名前の重複に注意。
+WL_FILENAME|ファイルタイプのルールから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
+ROLENAME_ITEMNAME|複合タイプのルールにより生成されるフィルタ。
+
+※ 動的に生成されるフィルタは名前の重複に注意。
 
 #### Example
 
@@ -195,6 +191,21 @@ PREPROCESS="sh /etc/iptables/script/preprocess.sh"
 # /etc/iptables/preprocess.sh
 iptables -N CUSTOM_FILTER
 ```
+
+### MAP
+設定後に実行するiptablesのコマンドを予約する。
+
+#### Example
+
+```sh
+MAP=("${MAP[@]}" "INPUT -p tcp --dport 80 -j PUBLIC")
+```
+
+### INTERVAL
+地域レジストリから取得するIP割り当ての更新間隔。
+
+### IDSIPS
+IDSまたはIPSを使用する場合に設定する。
 
 ### SECURE
 国別IPフィルタの構築中このフィルタを使用するアクセスをすべて破棄するか、およびロールに設定されたファイルが存在しない場合にエラーを発生させるかを設定する。
@@ -247,6 +258,11 @@ CentOS 6.6
 MIT License
 
 ## ChangeLog
+
+### 0.6.1
+
+* 設定保存確認および自動取り消し機能を追加
+* Compositeタイプのホワイトリストモードを修正
 
 ### 0.6.0
 

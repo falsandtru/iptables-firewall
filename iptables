@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.6.0
+# @version 0.6.1
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -30,7 +30,7 @@ PREPROCESS=
 POSTPROCESS=
 
 # ロール
-ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC BLACKLIST TEST)
+ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC TEST)
 LOCAL=(IPS ACCEPT)
 CONNECTION=(FIREWALL IPS ACCEPT)
 SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
@@ -39,11 +39,9 @@ AUTH=(whitelist/auth LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 PRIVATE=("whitelist/{auth,user}|DROP" LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 CUSTOMER=(LOCAL_COUNTRY FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
-BLACKLIST=(BLOCK_COUNTRY)
 TEST=("whitelist/{auth,user}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|DROP")
 
 # 適用
-MAP=()
 ## LOCAL
 MAP=("${MAP[@]}" "INPUT -i lo -j LOCAL")
 MAP=("${MAP[@]}" "OUTPUT -o lo -j LOCAL")
@@ -54,9 +52,9 @@ MAP=("${MAP[@]}" "INPUT -m state --state ESTABLISHED,RELATED -j CONNECTION")
 MAP=("${MAP[@]}" "OUTPUT -m state --state NEW,ESTABLISHED -j CONNECTION")
 MAP=("${MAP[@]}" "FORWARD -m state --state ESTABLISHED,RELATED -j CONNECTION")
 ## GLOBAL
-MAP=("${MAP[@]}" "INPUT -j BLACKLIST")
-MAP=("${MAP[@]}" "OUTPUT -j BLACKLIST")
-MAP=("${MAP[@]}" "FORWARD -j BLACKLIST")
+MAP=("${MAP[@]}" "INPUT -j BLOCK_COUNTRY")
+MAP=("${MAP[@]}" "OUTPUT -j BLOCK_COUNTRY")
+MAP=("${MAP[@]}" "FORWARD -j BLOCK_COUNTRY")
 ## SYSTEM
 ## - ICMP
 MAP=("${MAP[@]}" "INPUT -p icmp --icmp-type destination-unreachable -j SYSTEM")
@@ -130,7 +128,7 @@ IDSIPS=
 # 厳格更新
 SECURE=
 
-# ログの最大生成間隔
+# ログの最大生成速度
 LOG_LIMIT=60/m
 LOG_LIMIT_BURST=1000
 
@@ -750,14 +748,11 @@ BUILD_ROLE(){
         eval RULES="\${${ROLE}[@]}"
         local LINE=
         for RULE in ${RULES[@]}; do
+            local AS_WHITELIST=
             if [ ! "`echo $RULE | grep [,\|]`" ]; then
                 RULE=`BUILD_RULE $RULE`
                 if [ ! $RULE ]; then continue; fi
-                eval "$IPTABLES -A $ROLE -j $RULE"
-                if [ `echo $RULE | grep ^WL_` ]; then
-                    $IPTABLES -A $RULE -j TRACK_PROWLER
-                    $IPTABLES -A $RULE -j DROP
-                fi
+                AS_WHITELIST=`echo $RULE | grep ^WL_`
                 LINE="${LINE:+$LINE }$RULE"
             else
                 local C_RULES=(`eval echo ${RULE//|/ }`)
@@ -767,29 +762,33 @@ BUILD_ROLE(){
                 LINE="${LINE:+$LINE }$RULE("
                 for C_RULE in ${C_RULES[@]}; do
                     C_RULE=`BUILD_RULE $C_RULE`
+                    AS_WHITELIST=
                     if [ ! $C_RULE ]; then continue; fi
                     LINE="$LINE$C_RULE,"
                     local ifs=$IFS
                     IFS=$'\n'
                     if [ `echo $C_RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
+                        AS_WHITELIST=${AS_WHITELIST:+}
                         eval "$IPTABLES -A $RULE -j $C_RULE"
                     elif [ `echo $C_RULE | grep ^WL_` ]; then
-                        for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep ' -j RETURN' | sed -e 's/^-A[^-]*//'`; do
+                        AS_WHITELIST=${AS_WHITELIST:-1}
+                        for C_RULE in `$IPTABLES -S ${C_RULE} | grep ' -j RETURN' | sed -e 's/^-A[^-]*//'`; do
                             eval "$IPTABLES -A $RULE $C_RULE"
                         done
                     else
-                        for C_RULE in `IFS= ;$IPTABLES -S ${C_RULE} | grep '^-[AI] ' | sed -e 's/^-A[^-]*//'`; do
+                        AS_WHITELIST=${AS_WHITELIST:+}
+                        for C_RULE in `$IPTABLES -S ${C_RULE} | grep '^-[AI] ' | sed -e 's/^-A[^-]*//'`; do
                             eval "$IPTABLES -A $RULE $C_RULE"
                         done
                     fi
                     IFS=$ifs
                 done
                 LINE="${LINE%,})"
-                if [ ! "`$IPTABLES -S $RULE | grep "^-A [^ ]\+ -j"`" ]; then
-                    $IPTABLES -A $RULE -j TRACK_PROWLER
-                    $IPTABLES -A $RULE -j DROP
-                fi
-                $IPTABLES -A $ROLE -j $RULE
+            fi
+            eval "$IPTABLES -A $ROLE -j $RULE"
+            if [ $AS_WHITELIST ]; then
+                $IPTABLES -A $RULE -j TRACK_PROWLER
+                $IPTABLES -A $RULE -j DROP
             fi
         done
         eval RULES="\${${ROLE}[@]}"
@@ -910,8 +909,8 @@ if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUN
     echo "BUILD		Chain LOCAL_COUNTRY"
     echo "BUILD		Chain BLOCK_COUNTRY"
 
-    $IPTABLES -F LOCAL_COUNTRY 2>/dev/null
-    $IPTABLES -F BLOCK_COUNTRY 2>/dev/null
+    $IPTABLES -F LOCAL_COUNTRY
+    $IPTABLES -F BLOCK_COUNTRY
 
     BUILD_COUNTRY "delegated-apnic-extended-latest"   $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
     BUILD_COUNTRY "delegated-arin-extended-latest"    $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
@@ -944,8 +943,14 @@ echo "POSTPROCESS	$POSTPROCESS"
 #----------------------------------------------------------#
 
 # 設定保存(/etc/sysconfig/iptablesの既存の設定は削除)
-service iptables save
-sysctl -p 2>&1 | grep -v -E "^error:.*(ipv6|bridge-nf-call)"
-service rsyslog restart
+echo "Enter or y > save, n or timeout > revert"
+read -t 60 input
+if [ $? -eq 0 ] && [ "$input" != n ]; then
+    service iptables save
+    sysctl -p 2>&1 | grep -v -E "^error:.*(ipv6|bridge-nf-call)"
+    service rsyslog restart
+else
+    service iptables restart
+fi
 
 echo complete
