@@ -45,7 +45,7 @@ KEEP=(FIREWALL IPS ACCEPT)
 SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
 NETWORK=(whitelist/network FIREWALL FW_INTRUDER IPS ACCEPT)
 AUTH=(whitelist/auth COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
-PRIVATE=(whitelist/user COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
+PRIVATE=("whitelist/{auth,user}|DROP" COUNTRY_FILTER FIREWALL FW_INTRUDER IPS ACCEPT)
 CUSTOMER=(COUNTRY_FILTER FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
 
@@ -160,29 +160,93 @@ echo "PREPROCESS:	$PREPROCESS"
 `$PREPROCESS`
 
 # ロールチェーン生成
-$IPTABLES -N TRACK_PROWLER
-for ROLE in ${ROLES[@]}; do
-    $IPTABLES -N $ROLE 2>/dev/null
-    eval RULES="\${${ROLE}[@]}"
-    for RULE in ${RULES[@]}; do
-        LIST_FILE=`echo $LIST_DIR$RULE | sed 's|.*//|/|'`
-        if [ `echo $RULE | grep -E ^[A-Z_]\+$` ] || [ `$IPTABLES -S | grep "^-N $RULE$"` ]; then
-            $IPTABLES -N $RULE 2>/dev/null
-            $IPTABLES -A $ROLE -j $RULE
-        elif [ -r $LIST_FILE ] || [ $SECURE != false ]; then
-            CHAIN=`echo $RULE | awk -F / '{print "WL_"$NF}' | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
-            $IPTABLES -N $CHAIN 2>/dev/null
-            $IPTABLES -F $CHAIN
-            for LINE in `cat $LIST_FILE | grep ^[0-9]`
-            do
-                $IPTABLES -A $CHAIN -s $LINE -j RETURN
-            done
-            $IPTABLES -A $CHAIN -j TRACK_PROWLER
-            $IPTABLES -A $CHAIN -j DROP
-            $IPTABLES -A $ROLE -j $CHAIN
-        fi
+FILE_TO_CHAIN(){
+    local FILE=$1
+    local NAME=$2
+    if [ "`$IPTABLES -S | grep "^-N $NAME$"`" ]; then
+        return 0
+    elif [ ! -r $FILE ]; then
+        return 1
+    fi
+    $IPTABLES -N $NAME
+    $IPTABLES -F $NAME
+    local LINE
+    for LINE in `cat $FILE | grep ^[0-9]`
+    do
+        $IPTABLES -A $NAME -s $LINE -j RETURN
     done
-done
+    return 0
+}
+BUILD_RULE(){
+    local RULE=$1
+    if [ `echo $RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
+        RULE=$RULE
+    elif [ "`$IPTABLES -S | grep "^\(-N $RULE$\|-P $RULE \)"`" ]; then
+        RULE=$RULE
+    elif [ `echo $RULE | grep -E ^[A-Z_]\+$` ]; then
+        $IPTABLES -N $RULE
+        [ $? -ne 0 ] && RULE=
+    else
+        local FILE=`echo $LIST_DIR$RULE | sed 's|.*//|/|'`
+        if [ -r $FILE ]; then
+            RULE=${RULE##*/}
+            RULE=`echo WL_$RULE | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
+            FILE_TO_CHAIN $FILE $RULE
+        else
+            RULE=
+            [ $SECURE = false ]
+        fi
+        [ $? -ne 0 ] && RULE=
+    fi
+    echo $RULE
+}
+BUILD_ROLE(){
+    local ROLE
+    local RULES
+    local RULE
+    for ROLE in ${ROLES[@]}; do
+        $IPTABLES -N $ROLE
+        eval RULES="\${${ROLE}[@]}"
+        for RULE in ${RULES[@]}; do
+            if [ ! "`echo $RULE | grep ,`" ]; then
+                RULE=`BUILD_RULE $RULE`
+                if [ ! $RULE ]; then continue; fi
+                $IPTABLES -A $ROLE -j $RULE
+                if [ `echo $RULE | grep ^WL_` ]; then
+                    $IPTABLES -A $RULE -j TRACK_PROWLER
+                    $IPTABLES -A $RULE -j DROP
+                fi
+            else
+                local C_RULES=(`eval echo ${RULE//|/ }`)
+                local C_RULE
+                RULE=`echo ${ROLE}_${C_RULES[0]##*/} | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
+                $IPTABLES -N $RULE
+                for C_RULE in ${C_RULES[@]}; do
+                    C_RULE=`BUILD_RULE $C_RULE`
+                    if [ ! $C_RULE ]; then continue; fi
+                    if [ `echo $C_RULE | grep -E "^(ACCEPT|DROP|RETURN|(REJECT|LOG|NFQUEUE)( .*)?)$"` ]; then
+                        $IPTABLES -A $RULE -j $C_RULE
+                    elif [ `echo $C_RULE | grep ^WL_` ]; then
+                        for C_RULE in "`$IPTABLES -S ${C_RULE} | grep '^-A .* -s ' | sed -e 's/^-A[^-]*//'`"; do
+                            $IPTABLES -A $RULE $C_RULE
+                        done
+                    else
+                        for C_RULE in "`$IPTABLES -S ${C_RULE} | grep '^-A ' | sed -e 's/^-A[^-]*//'`"; do
+                            $IPTABLES -A $RULE $C_RULE
+                        done
+                    fi
+                done
+                if [ ! "`$IPTABLES -S $RULE | grep "^-A [^ ]\+ -j"`" ]; then
+                    $IPTABLES -A $RULE -j TRACK_PROWLER
+                    $IPTABLES -A $RULE -j DROP
+                fi
+                $IPTABLES -A $ROLE -j $RULE
+            fi
+        done
+    done
+}
+$IPTABLES -N TRACK_PROWLER
+BUILD_ROLE
 
 # SECURE
 if [ $SECURE != false ]; then
