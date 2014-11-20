@@ -73,18 +73,16 @@ CACHE_DIR=/var/cache/iptables/
 
 echo "iptables firewall"
 
-# SSHポート
+# Default
+${TRAP:=false}
+${SECURE:=false}
+
+# SSH
 [[ ! $LOGIN -gt 0 ]] && LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 echo "LOGIN:		$LOGIN"
 
-# TRAP
-[ -z $TRAP ] && TRAP=false
-
-# SECURE
-[ -z $SECURE ] && SECURE=false
-
 # IPS/IDS
-if [ -z $IDSIPS ]; then
+if [ ! $IDSIPS ]; then
     if [ `ps alx | grep -v grep | grep /snort | head -n 1 | cut -c1` ]; then
         IDSIPS=Snort
     else
