@@ -87,7 +87,7 @@ COUNTRY_FILTER|ACCEPT_COUNTRY_CODEで指定した国のIPのみ通過させる�
 FIREWALL|不審なパケットを破棄し、そうでないパケットのみ通過させる。
 FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
-WL_filename|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
+WL_FILENAME|ファイルから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
 
 #### Example
 
@@ -220,6 +220,10 @@ $ vi /etc/logrotate.d/iptables
 MIT License
 
 ## ChangeLog
+
+### 0.5.3
+
+* ファイルから生成するフィルタのファイル名部分を大文字に変換するよう変更
 
 ### 0.5.2
 
