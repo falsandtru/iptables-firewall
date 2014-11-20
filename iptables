@@ -764,7 +764,7 @@ BUILD_ROLE(){
                 local C_RULE
                 RULE=`echo ${ROLE}_${C_RULES[0]##*/} | cut -d. -f1 | tr '[a-z]' '[A-Z]'`
                 $IPTABLES -N $RULE
-                LINE="${LINE:+$LINE }$RULE{"
+                LINE="${LINE:+$LINE }$RULE("
                 for C_RULE in ${C_RULES[@]}; do
                     C_RULE=`BUILD_RULE $C_RULE`
                     if [ ! $C_RULE ]; then continue; fi
@@ -784,7 +784,7 @@ BUILD_ROLE(){
                     fi
                     IFS=$ifs
                 done
-                LINE="${LINE%,}}"
+                LINE="${LINE%,})"
                 if [ ! "`$IPTABLES -S $RULE | grep "^-A [^ ]\+ -j"`" ]; then
                     $IPTABLES -A $RULE -j TRACK_PROWLER
                     $IPTABLES -A $RULE -j DROP
