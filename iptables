@@ -659,7 +659,7 @@ $IPTABLES -A ANTI_PORTSCAN -i w+ -j ANTI_PORTSCAN_
 $IPTABLES -A ANTI_PORTSCAN_ -j FW_BROADCAST
 $IPTABLES -A ANTI_PORTSCAN_ -j FW_MULTICAST
 $IPTABLES -A ANTI_PORTSCAN_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_ATTACKER
+$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_PROWLER
 
 
 #----------------------------------------------------------#
