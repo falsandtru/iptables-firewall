@@ -226,15 +226,6 @@ $IPTABLES -N IDS
 # Preprocess                                               #
 #----------------------------------------------------------#
 
-# SECURE
-if [ $SECURE != false ]; then
-    $IPTABLES -I LOCAL_COUNTRY -j DROP
-    $IPTABLES -I BLOCK_COUNTRY -j DROP
-else
-    $IPTABLES -I LOCAL_COUNTRY -j ACCEPT
-    $IPTABLES -I BLOCK_COUNTRY -j ACCEPT
-fi
-
 # PREPROCESS
 echo "PREPROCESS	$PREPROCESS"
 `$PREPROCESS`
@@ -911,7 +902,21 @@ if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUN
     echo "BUILD		Chain BLOCK_COUNTRY"
 
     $IPTABLES -F LOCAL_COUNTRY
+    $IPTABLES -A LOCAL_COUNTRY -i lo -j RETURN
+    $IPTABLES -A LOCAL_COUNTRY -o lo -j RETURN
+
     $IPTABLES -F BLOCK_COUNTRY
+    $IPTABLES -A BLOCK_COUNTRY -i lo -j RETURN
+    $IPTABLES -A BLOCK_COUNTRY -o lo -j RETURN
+
+    # SECURE
+    if [ $SECURE != false ]; then
+      $IPTABLES -I LOCAL_COUNTRY -j DROP
+      $IPTABLES -I BLOCK_COUNTRY -j DROP
+    else
+      $IPTABLES -I LOCAL_COUNTRY -j RETURN
+      $IPTABLES -I BLOCK_COUNTRY -j RETURN
+    fi
 
     BUILD_COUNTRY "delegated-apnic-extended-latest"   $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
     BUILD_COUNTRY "delegated-arin-extended-latest"    $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
@@ -920,6 +925,11 @@ if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUN
     BUILD_COUNTRY "delegated-afrinic-extended-latest" $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
 
     $IPTABLES -A LOCAL_COUNTRY -j DROP
+
+    # 一時設定を削除
+    $IPTABLES -D LOCAL_COUNTRY 1 2>/dev/null
+    $IPTABLES -D BLOCK_COUNTRY 1 2>/dev/null
+
 else
     [ $LOCAL_COUNTRY_CODE ] && echo "REUSE		Chain LOCAL_COUNTRY"
     [ $BLOCK_COUNTRY_CODE ] && echo "REUSE		Chain BLOCK_COUNTRY"
@@ -927,12 +937,8 @@ fi
 
 
 #----------------------------------------------------------#
-# Postprocess                                               #
+# Postprocess                                              #
 #----------------------------------------------------------#
-
-# 一時設定を削除
-$IPTABLES -D LOCAL_COUNTRY 1 2>/dev/null
-$IPTABLES -D BLOCK_COUNTRY 1 2>/dev/null
 
 # POSTPROCESS
 echo "POSTPROCESS	$POSTPROCESS"
