@@ -111,7 +111,7 @@ ROLES=(TEST)
 MAP=("${MAP[@]}" "INPUT -p tcp --dport 80 -j TEST")
 ```
 
-### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
+### RULES(GLOBAL/LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
 既定のロールルール設定。ルールは左から順に適用される。
 
 ファイル、ユーザー定義チェーン、ジャンプターゲットおよびこれらをあらかじめ結合するフォーマットを組み合わせてルールを構築する。
@@ -266,6 +266,7 @@ MIT License
 ### 0.6.3
 
 * IPFを攻撃者から照合するよう変更
+* GLOBALロールを追加
 
 ### 0.6.2
 
