@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.6.2
+# @version 0.6.3
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -30,7 +30,8 @@ PREPROCESS=
 POSTPROCESS=
 
 # ロール
-ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC TEST)
+ROLES=(GLOBAL LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC TEST)
+GLOBAL=(FW_BROADCAST FW_MULTICAST BLOCK_COUNTRY)
 LOCAL=(IPS ACCEPT)
 CONNECTION=(FIREWALL IPS ACCEPT)
 SYSTEM=(whitelist/system FIREWALL IPF IPS ACCEPT)
@@ -52,9 +53,9 @@ MAP=("${MAP[@]}" "INPUT -m state --state ESTABLISHED,RELATED -j CONNECTION")
 MAP=("${MAP[@]}" "OUTPUT -m state --state NEW,ESTABLISHED -j CONNECTION")
 MAP=("${MAP[@]}" "FORWARD -m state --state ESTABLISHED,RELATED -j CONNECTION")
 ## GLOBAL
-MAP=("${MAP[@]}" "INPUT -j BLOCK_COUNTRY")
-MAP=("${MAP[@]}" "OUTPUT -j BLOCK_COUNTRY")
-MAP=("${MAP[@]}" "FORWARD -j BLOCK_COUNTRY")
+MAP=("${MAP[@]}" "INPUT -j GLOBAL")
+MAP=("${MAP[@]}" "OUTPUT -j GLOBAL")
+MAP=("${MAP[@]}" "FORWARD -j GLOBAL")
 ## SYSTEM
 ## - ICMP
 MAP=("${MAP[@]}" "INPUT -p icmp --icmp-type destination-unreachable -j SYSTEM")
@@ -225,15 +226,6 @@ $IPTABLES -N IDS
 # Preprocess                                               #
 #----------------------------------------------------------#
 
-# SECURE
-if [ $SECURE != false ]; then
-    $IPTABLES -I LOCAL_COUNTRY -j DROP
-    $IPTABLES -I BLOCK_COUNTRY -j DROP
-else
-    $IPTABLES -I LOCAL_COUNTRY -j ACCEPT
-    $IPTABLES -I BLOCK_COUNTRY -j ACCEPT
-fi
-
 # PREPROCESS
 echo "PREPROCESS	$PREPROCESS"
 `$PREPROCESS`
@@ -319,14 +311,14 @@ $IPTABLES -A ANTI_INTRUDER -i e+ -j ANTI_INTRUDER_
 $IPTABLES -A ANTI_INTRUDER -i p+ -j ANTI_INTRUDER_
 $IPTABLES -A ANTI_INTRUDER -i w+ -j ANTI_INTRUDER_
 # 既知のポートはフィルタしない
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER__
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER__
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER__
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-rapid --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-fast --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-medium --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-slow --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
 $IPTABLES -A ANTI_INTRUDER__ -j DROP
 #$IPTABLES -A FIREWALL -j IPF && echo "FIREWALL	ANTI_INTRUDER"
@@ -910,7 +902,21 @@ if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUN
     echo "BUILD		Chain BLOCK_COUNTRY"
 
     $IPTABLES -F LOCAL_COUNTRY
+    $IPTABLES -A LOCAL_COUNTRY -i lo -j RETURN
+    $IPTABLES -A LOCAL_COUNTRY -o lo -j RETURN
+
     $IPTABLES -F BLOCK_COUNTRY
+    $IPTABLES -A BLOCK_COUNTRY -i lo -j RETURN
+    $IPTABLES -A BLOCK_COUNTRY -o lo -j RETURN
+
+    # SECURE
+    if [ $SECURE != false ]; then
+      $IPTABLES -I LOCAL_COUNTRY -j DROP
+      $IPTABLES -I BLOCK_COUNTRY -j DROP
+    else
+      $IPTABLES -I LOCAL_COUNTRY -j RETURN
+      $IPTABLES -I BLOCK_COUNTRY -j RETURN
+    fi
 
     BUILD_COUNTRY "delegated-apnic-extended-latest"   $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
     BUILD_COUNTRY "delegated-arin-extended-latest"    $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
@@ -919,6 +925,11 @@ if [ $RESET -ne 0 ] || [ ! -z "$LOCAL_COUNTRY_CODE" -a $($IPTABLES -S LOCAL_COUN
     BUILD_COUNTRY "delegated-afrinic-extended-latest" $LOCAL_COUNTRY_CODE $BLOCK_COUNTRY_CODE
 
     $IPTABLES -A LOCAL_COUNTRY -j DROP
+
+    # 一時設定を削除
+    $IPTABLES -D LOCAL_COUNTRY 1 2>/dev/null
+    $IPTABLES -D BLOCK_COUNTRY 1 2>/dev/null
+
 else
     [ $LOCAL_COUNTRY_CODE ] && echo "REUSE		Chain LOCAL_COUNTRY"
     [ $BLOCK_COUNTRY_CODE ] && echo "REUSE		Chain BLOCK_COUNTRY"
@@ -926,12 +937,8 @@ fi
 
 
 #----------------------------------------------------------#
-# Postprocess                                               #
+# Postprocess                                              #
 #----------------------------------------------------------#
-
-# 一時設定を削除
-$IPTABLES -D LOCAL_COUNTRY 1 2>/dev/null
-$IPTABLES -D BLOCK_COUNTRY 1 2>/dev/null
 
 # POSTPROCESS
 echo "POSTPROCESS	$POSTPROCESS"

@@ -33,10 +33,10 @@ Layer3 |                                                               |  |     
        |                          LOCAL_COUNTRY                       --->|       |
        |______________________________ V ______________________________|  |       |
 Layer4 |                                                               |  |       |
-       |                            FIERWALL                          --->|       |
+       |                            FIERWALL  ( --> TRACK_ATTACKER )  --->|       |
        |______________________________ V ______________________________|  |       |
 Layer5 |                                                               |  |       |
-       |                              IPF                             --->|       |
+       |                              IPF  ( ANTI_PROWLER/ATTACKER )  --->|       |
        |______________ V ______________________________________________|  |       |
 Layer6 |                               |               |               |  |       |
        |            IDS/IPS           -->     LOG     -->     DROP    --->|       |
@@ -111,7 +111,7 @@ ROLES=(TEST)
 MAP=("${MAP[@]}" "INPUT -p tcp --dport 80 -j TEST")
 ```
 
-### RULES(LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
+### RULES(GLOBAL/LOCAL/CONNECTION/SYSTEM/NETWORK/AUTH/PRIVATE/CUSTOMER/PUBLIC)
 既定のロールルール設定。ルールは左から順に適用される。
 
 ファイル、ユーザー定義チェーン、ジャンプターゲットおよびこれらをあらかじめ結合するフォーマットを組み合わせてルールを構築する。
@@ -262,6 +262,11 @@ CentOS 6.6
 MIT License
 
 ## ChangeLog
+
+### 0.6.3
+
+* IPFを攻撃者から照合するよう変更
+* GLOBALロールを追加
 
 ### 0.6.2
 
