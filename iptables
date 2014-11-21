@@ -319,14 +319,14 @@ $IPTABLES -A ANTI_INTRUDER -i e+ -j ANTI_INTRUDER_
 $IPTABLES -A ANTI_INTRUDER -i p+ -j ANTI_INTRUDER_
 $IPTABLES -A ANTI_INTRUDER -i w+ -j ANTI_INTRUDER_
 # 既知のポートはフィルタしない
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER__
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER__
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER__
-$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-rapid --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-fast --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-medium --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-slow --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-rapid --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-fast --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-medium --update --rttl -j ANTI_INTRUDER__
+$IPTABLES -A ANTI_INTRUDER_ -m recent --name prowler-slow --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
 $IPTABLES -A ANTI_INTRUDER__ -j DROP
 #$IPTABLES -A FIREWALL -j IPF && echo "FIREWALL	ANTI_INTRUDER"
