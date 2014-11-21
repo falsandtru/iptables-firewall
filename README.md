@@ -8,7 +8,7 @@
 
 == config ==
   ROLES=(SSH)
-  SSH=(BLOCK_COUNTRY "file{1,2}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|LOG...|DROP")
+  SSH=(BLOCK_COUNTRY "file{1,2}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL IPF "IPS|LOG...|DROP")
   ...
   MAP=("${MAP[@]}" "INPUT -p tcp --dport 60022 -j SSH")
   MAP=("${MAP[@]}" "INPUT -j TRAP_PORTSCAN")
@@ -19,7 +19,7 @@
             INTERNET
         ______ V ______________________________________________________    _______
 INPUT  |               | TCP UDP ICMP                                  |  |       |
-       |   TCP 60022   |       TRAP_PORTSCAN  ( --> TRACK_PROWLER )   --->| POLICY|
+       |   TCP 60022   |       TRAP_PORTSCAN  ( --> TRACK_PROWLER  )  --->| POLICY|
        |               |                                               |  |       |
        |====== | ======|===============================================|  |_______|
        |====== V ======|===============================================|   _______
@@ -36,7 +36,7 @@ Layer4 |                                                               |  |     
        |                            FIERWALL                          --->|       |
        |______________________________ V ______________________________|  |       |
 Layer5 |                                                               |  |       |
-       |                          FW_INTRUDER  ( --> TRACK_ATTACKER ) --->|       |
+       |                              IPF                             --->|       |
        |______________ V ______________________________________________|  |       |
 Layer6 |                               |               |               |  |       |
        |            IDS/IPS           -->     LOG     -->     DROP    --->|       |
@@ -57,6 +57,7 @@ SERVICE|                                                               |
 * 国別IPフィルタリング
 * プリプロセス/ポストプロセスコマンド実行
 * 地域レジストリIP割り当ての自動取得/更新/適用
+* 設定保存確認およびタイムアウトによるロールバック
 
 ## Usage
 
@@ -134,9 +135,12 @@ Name|Description
 ----|-----------
 LOCAL_COUNTRY|LOCAL_COUNTRY_CODEで指定した国のIPのみ通過させる。
 BLOCK_COUNTRY|BLOCK_COUNTRY_CODEで指定した国のIPを破棄する。
-FIREWALL|攻撃または不審なパケットを破棄し、そうでないパケットのみ通過させる。
-FW_INTRUDER|不審なIPを遮断するオプションファイアウォールフィルタ。既知のポート(0-1023)は保護しない。
+FIREWALL|攻撃および不審なパケットを破棄し、そうでないパケットのみ通過させる。種類に応じてIPを追跡する。
+IPF|攻撃者および不審者のIPを遮断する。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
+TRAP_PORTSCAN|INPUTおよびFORWARDチェーンの末尾に設定することでポートスキャンを補足しIPを追跡する。
+TRACK_PROWLER|不審者としてIPを追跡する。
+TRACK_ATTACKER|攻撃者としてIPを追跡する。
 WL_FILENAME|ファイルタイプのルールから生成されるホワイトリストフィルタ。遮断したIPは不審なIPとして登録される。
 ROLENAME_ITEMNAME|複合タイプのルールにより生成されるフィルタ。
 
@@ -146,7 +150,7 @@ ROLENAME_ITEMNAME|複合タイプのルールにより生成されるフィル�
 
 ```sh
 # TESTロールにルールを設定
-TEST=(whitelist/private LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
+TEST=(whitelist/private LOCAL_COUNTRY FIREWALL IPF IPS ACCEPT)
 # 1. whitelist/private
 # ファイルに記述されたIPのみ通過させ、ほかは遮断する。
 #
@@ -156,7 +160,7 @@ TEST=(whitelist/private LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
 # 3. FIREWALL
 # Firewallを適用し接続を検疫する。
 #
-# 4. FW_INTRUDER
+# 4. IPF
 # 攻撃行為または不審行為のあったIPを遮断する。
 #
 # 5. IPS
@@ -259,10 +263,14 @@ MIT License
 
 ## ChangeLog
 
+### 0.6.2
+
+* FW_INTRUDERをIPFに変更
+
 ### 0.6.1
 
-* 設定保存確認および自動取り消し機能を追加
-* Compositeタイプのホワイトリストモードを修正
+* 設定保存確認および自動ロールバック機能を追加
+* Compositeタイプのホワイトリスト動作を修正
 
 ### 0.6.0
 

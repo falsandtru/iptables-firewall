@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.6.1
+# @version 0.6.2
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -33,13 +33,13 @@ POSTPROCESS=
 ROLES=(LOCAL CONNECTION SYSTEM NETWORK AUTH PRIVATE CUSTOMER PUBLIC TEST)
 LOCAL=(IPS ACCEPT)
 CONNECTION=(FIREWALL IPS ACCEPT)
-SYSTEM=(whitelist/system FIREWALL FW_INTRUDER IPS ACCEPT)
-NETWORK=(whitelist/network FIREWALL FW_INTRUDER IPS ACCEPT)
-AUTH=(whitelist/auth LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
-PRIVATE=("whitelist/{auth,user}|DROP" LOCAL_COUNTRY FIREWALL FW_INTRUDER IPS ACCEPT)
+SYSTEM=(whitelist/system FIREWALL IPF IPS ACCEPT)
+NETWORK=(whitelist/network FIREWALL IPF IPS ACCEPT)
+AUTH=(whitelist/auth LOCAL_COUNTRY FIREWALL IPF IPS ACCEPT)
+PRIVATE=("whitelist/{auth,user}|DROP" LOCAL_COUNTRY FIREWALL IPF IPS ACCEPT)
 CUSTOMER=(LOCAL_COUNTRY FIREWALL IPS ACCEPT)
 PUBLIC=(FIREWALL IPS ACCEPT)
-TEST=("whitelist/{auth,user}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL FW_INTRUDER "IPS|DROP")
+TEST=("whitelist/{auth,user}|TRACK_PROWLER|DROP" LOCAL_COUNTRY FIERWALL IPF "IPS|DROP")
 
 # 適用
 ## LOCAL
@@ -308,13 +308,13 @@ $IPTABLES -A FW_BASIC -j FW_MULTICAST
 # 不正なアクセスを行ったIPからのすべてのアクセスをログを記録して破棄
 # ※調査的アクセスから公開ポートを隠蔽する
 # ※公表サーバーでは無効にしてよい
-$IPTABLES -N FW_INTRUDER 2>/dev/null
+$IPTABLES -N IPF 2>/dev/null
 $IPTABLES -N ANTI_INTRUDER
 $IPTABLES -N ANTI_INTRUDER_
 $IPTABLES -N ANTI_INTRUDER__
-$IPTABLES -A FW_INTRUDER -p tcp ! --dport 0:1023 -m state --state NEW,INVALID -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -p udp -m state --state NEW,INVALID -j ANTI_INTRUDER
-$IPTABLES -A FW_INTRUDER -p icmp -j ANTI_INTRUDER
+$IPTABLES -A IPF -p tcp ! --dport 0:1023 -m state --state NEW,INVALID -j ANTI_INTRUDER
+$IPTABLES -A IPF -p udp -m state --state NEW,INVALID -j ANTI_INTRUDER
+$IPTABLES -A IPF -p icmp -j ANTI_INTRUDER
 $IPTABLES -A ANTI_INTRUDER -i e+ -j ANTI_INTRUDER_
 $IPTABLES -A ANTI_INTRUDER -i p+ -j ANTI_INTRUDER_
 $IPTABLES -A ANTI_INTRUDER -i w+ -j ANTI_INTRUDER_
@@ -329,7 +329,7 @@ $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-medium --update --rttl -j 
 $IPTABLES -A ANTI_INTRUDER_ -m recent --name attacker-slow --update --rttl -j ANTI_INTRUDER__
 $IPTABLES -A ANTI_INTRUDER__ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES INTRUDER] : '
 $IPTABLES -A ANTI_INTRUDER__ -j DROP
-#$IPTABLES -A FIREWALL -j FW_INTRUDER && echo "FIREWALL	ANTI_INTRUDER"
+#$IPTABLES -A FIREWALL -j IPF && echo "FIREWALL	ANTI_INTRUDER"
 # recentモジュールは初期値で100IPしか記憶できない
 # 送信元を偽装したパケットを大量に送りつけるか調査元の絶対数が増えると容易に無効化されるため対処されれば効果はない
 # 攻撃価値の不明なIPの存在確認とポートスキャンに必要となる最小コストを上げる防御としては有効
@@ -470,7 +470,7 @@ $IPTABLES -A FW_BASIC -j FW_SPOOFING
 # ※ステルススキャン対策
 # ※既知のポートはもともと隠密性がないため保護せず誤作動の回避を優先
 # ※SSHの終了処理をしないで切断されると簡単に自爆するので注意
-# ※FW_PORTSCANとFW_INTRUDERが機能しているうちは有効にする必要性は低い
+# ※TRAP_PORTSCANとIPFが機能しているうちは有効にする必要性は低い
 # ※フラグパターンの妥当性未検証
 # ※公表サーバーでは無効にしてよい
 $IPTABLES -N FW_STEALTHSCAN 2>/dev/null
@@ -659,7 +659,7 @@ $IPTABLES -A ANTI_PORTSCAN -i w+ -j ANTI_PORTSCAN_
 $IPTABLES -A ANTI_PORTSCAN_ -j FW_BROADCAST
 $IPTABLES -A ANTI_PORTSCAN_ -j FW_MULTICAST
 $IPTABLES -A ANTI_PORTSCAN_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES PORTSCAN] : '
-$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_ATTACKER
+$IPTABLES -A ANTI_PORTSCAN_ -j TRACK_PROWLER
 
 
 #----------------------------------------------------------#
