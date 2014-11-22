@@ -263,6 +263,10 @@ MIT License
 
 ## ChangeLog
 
+### 0.6.4
+
+* FW_BROADCASTをFIREWALLから除外
+
 ### 0.6.3
 
 * IPFを攻撃者から照合するよう変更
