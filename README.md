@@ -266,6 +266,7 @@ MIT License
 ### 0.6.4
 
 * FW_BROADCASTをFIREWALLから除外
+* FW_MULTICASTをFIREWALLから除外
 
 ### 0.6.3
 
