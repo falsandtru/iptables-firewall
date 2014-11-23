@@ -150,7 +150,8 @@ CACHE_DIR=/var/cache/iptables/
 echo "iptables firewall"
 
 # Default
-${SECURE:=false}
+RESULT=0
+SECURE=${SECURE:-false}
 
 # IPS/IDS
 if [ ! $IDSIPS ]; then
@@ -737,9 +738,12 @@ BUILD_ROLE(){
         local LINE=
         for RULE in ${RULES[@]}; do
             local AS_WHITELIST=
+            local ERROR=
             if [ ! "`echo $RULE | grep [,\|]`" ]; then
+                ERROR=$RULE
                 RULE=`BUILD_RULE $RULE`
-                if [ ! $RULE ]; then continue; fi
+                [ ! $RULE ] && [ $SECURE != false ] && RESULT=1
+                if [ ! $RULE ]; then [ $SECURE != false ] && echo "ERROR		$ROLE[$ERROR]" >&2; continue; fi
                 AS_WHITELIST=`echo $RULE | grep ^WL_`
                 LINE="${LINE:+$LINE }$RULE"
             else
@@ -749,9 +753,11 @@ BUILD_ROLE(){
                 $IPTABLES -N $RULE
                 LINE="${LINE:+$LINE }$RULE("
                 for C_RULE in ${C_RULES[@]}; do
-                    C_RULE=`BUILD_RULE $C_RULE`
                     AS_WHITELIST=
-                    if [ ! $C_RULE ]; then continue; fi
+                    ERROR=$C_RULE
+                    C_RULE=`BUILD_RULE $C_RULE`
+                    [ ! $C_RULE ] && [ $SECURE != false ] && RESULT=1
+                    if [ ! $C_RULE ]; then [ $SECURE != false ] && echo "ERROR		$ROLE[$ERROR]" >&2; continue; fi
                     LINE="$LINE$C_RULE,"
                     local ifs=$IFS
                     IFS=$'\n'
@@ -946,6 +952,7 @@ echo "POSTPROCESS	$POSTPROCESS"
 #----------------------------------------------------------#
 
 # 設定保存(/etc/sysconfig/iptablesの既存の設定は削除)
+[ $RESULT -eq 0 ] && echo "RESULT		Success" || echo "RESULT		Failure"
 echo "Enter or y > save, n or timeout > revert"
 read -t 60 input
 if [ $? -eq 0 ] && [ "$input" != n ]; then
@@ -957,3 +964,5 @@ else
 fi
 
 echo complete
+
+exit $RESULT
