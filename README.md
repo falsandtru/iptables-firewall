@@ -135,7 +135,7 @@ Name|Description
 ----|-----------
 LOCAL_COUNTRY|LOCAL_COUNTRY_CODEで指定した国のIPのみ通過させる。
 BLOCK_COUNTRY|BLOCK_COUNTRY_CODEで指定した国のIPを破棄する。
-FIREWALL|攻撃および不審なパケットを破棄し、そうでないパケットのみ通過させる。種類に応じてIPを追跡する。
+FIREWALL|FW_接頭辞によるFirewallモジュールを適用する。各モジュールは個別に利用可能。
 IPF|攻撃者および不審者のIPを遮断する。既知のポート(0-1023)は保護しない。
 IPS/IDS|IPS/IDSが設定されている場合にパケットを転送する。設定がない場合はすべて通過する。
 TRAP_PORTSCAN|INPUTおよびFORWARDチェーンの末尾に設定することでポートスキャンを補足しIPを追跡する。
@@ -145,6 +145,24 @@ WL_FILENAME|ファイルタイプのルールから生成されるホワイト�
 ROLENAME_ITEMNAME|複合タイプのルールにより生成されるフィルタ。
 
 ※ 動的に生成されるフィルタは名前の重複に注意。
+
+#### Firewall
+
+Module|Target|Option|TRACK
+------|-----------|:------:|:---:
+FW_BROADCAST|ブロードキャストパケット。|O|X
+FW_MULTICAST|マルチキャストパケット。|O|X
+FW_FRAGMENT|断片化されたパケット。|X|O
+FW_INVALID|不正なパケット。|X|X
+FW_NETBIOS|ネットバイオス関連のパケット。|X|O
+FW_STEALTHSCAN|フラグの不適切なパケット。|O|O
+FW_SPOOFING|内部パケットに偽装された外部パケット。|X|O
+FW_BRUTEFORCE|パスワード解析|X|O
+FW_PINGDEATH|pingによるサービス妨害。|X|O
+FW_SYNFLOOD|TCPプロトコルでのHTTPサービス妨害。|X|X
+FW_SYNFLOOD_SSL|TCPプロトコルでのHTTPSサービス妨害。|X|X
+FW_UDPFLOOD|UDPプロトコルでのサービス妨害。|X|X
+FW_ICMPFLOOD|ICMPプロトコルでのサービス妨害。|X|X
 
 #### Example
 
