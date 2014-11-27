@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.6.4
+# @version 0.6.5
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -499,7 +499,7 @@ $IPTABLES -A ANTI_SPOOFING__ -j DROP
 $IPTABLES -A FIREWALL -j FW_SPOOFING && echo "FIREWALL	ANTI_SPOOFING"
 $IPTABLES -A FW_BASIC -j FW_SPOOFING
 
-# 管理用ポートへ3分間に10回を超えて接続試行をログを記録して破棄してNG
+# 管理用ポートへの3分間に10回を超える接続試行をログを記録して破棄してNG
 # ※Brute Force攻撃対策
 $IPTABLES -N FW_BRUTEFORCE 2>/dev/null
 $IPTABLES -N ANTI_BRUTEFORCE
@@ -509,13 +509,13 @@ $IPTABLES -A ANTI_BRUTEFORCE -i e+ -p tcp -m state --state NEW -j ANTI_BRUTEFORC
 $IPTABLES -A ANTI_BRUTEFORCE -i p+ -p tcp -m state --state NEW -j ANTI_BRUTEFORCE_
 $IPTABLES -A ANTI_BRUTEFORCE -i w+ -p tcp -m state --state NEW -j ANTI_BRUTEFORCE_
 $IPTABLES -A ANTI_BRUTEFORCE_ \
--m hashlimit \
---hashlimit-name bruteforce \
---hashlimit 1/m \
---hashlimit-burst 7 \
---hashlimit-mode srcip \
---hashlimit-htable-expire 180000 \
--j RETURN
+          -m hashlimit \
+          --hashlimit-name bruteforce \
+          --hashlimit 1/m \
+          --hashlimit-burst 7 \
+          --hashlimit-mode srcip \
+          --hashlimit-htable-expire 180000 \
+          -j RETURN
 $IPTABLES -A ANTI_BRUTEFORCE_ -m limit --limit $LOG_LIMIT --limit-burst $LOG_LIMIT_BURST -j LOG --log-level debug --log-prefix '[IPTABLES BRUTEFORCE] : '
 $IPTABLES -A ANTI_BRUTEFORCE_ -j TRACK_ATTACKER
 $IPTABLES -A ANTI_BRUTEFORCE_ -j DROP

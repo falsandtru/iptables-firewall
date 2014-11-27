@@ -281,6 +281,10 @@ MIT License
 
 ## ChangeLog
 
+### 0.6.5
+
+* コードフォーマットを修正
+
 ### 0.6.4
 
 * FW_BROADCASTをFIREWALLから除外
