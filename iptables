@@ -70,7 +70,7 @@ MAP=("${MAP[@]}" "OUTPUT -d $NAMESERVERS -p udp --sport 53 -j SYSTEM")
 MAP=("${MAP[@]}" "FORWARD -s $NAMESERVERS -p udp --dport 53 -j SYSTEM")
 MAP=("${MAP[@]}" "FORWARD -d $NAMESERVERS -p udp --sport 53 -j SYSTEM")
 ## - NTP
-NTPSERVERS=$(echo $(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}') | tr ' ' ,)
+NTPSERVERS=$(echo $(grep '^server' /etc/{ntp,chrony}.conf 2>/dev/null | cut -d' ' -f2) | tr ' ' ,)
 MAP=("${MAP[@]}" "INPUT -s $NTPSERVERS -p udp --dport 123 -j SYSTEM")
 MAP=("${MAP[@]}" "OUTPUT -d $NTPSERVERS -p udp --sport 123 -j SYSTEM")
 MAP=("${MAP[@]}" "FORWARD -s $NTPSERVERS -p udp --dport 123 -j SYSTEM")
