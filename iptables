@@ -167,7 +167,7 @@ fi
 # Download                                                 #
 #----------------------------------------------------------#
 
-WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
+WGET="wget -N --retr-symlinks -P ${CACHE_DIR}"
 
 [ ! -e $CACHE_DIR ] && mkdir -p $CACHE_DIR
 if [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
