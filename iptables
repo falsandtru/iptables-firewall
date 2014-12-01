@@ -3,7 +3,7 @@
 #
 # iptables firewall
 #
-# @version 0.6.5
+# @version 0.6.6
 # @author falsandtru https://github.com/falsandtru/iptables-firewall/
 # @copyright 2014, falsandtru
 # @license MIT
@@ -14,7 +14,7 @@
 #----------------------------------------------------------#
 
 # 管理用ポート番号
-LOGIN=`cat /etc/ssh/sshd_config | grep '^Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
+LOGIN=`cat /etc/ssh/sshd_config | grep '^#\?Port ' | tail -n 1 | sed -e 's/^[^0-9]*\([0-9]\+\).*$/\1/'`
 
 # 国別処理
 # - 許可 日本
@@ -70,7 +70,7 @@ MAP=("${MAP[@]}" "OUTPUT -d $NAMESERVERS -p udp --sport 53 -j SYSTEM")
 MAP=("${MAP[@]}" "FORWARD -s $NAMESERVERS -p udp --dport 53 -j SYSTEM")
 MAP=("${MAP[@]}" "FORWARD -d $NAMESERVERS -p udp --sport 53 -j SYSTEM")
 ## - NTP
-NTPSERVERS=$(echo $(grep '^server' /etc/ntp.conf | cut -d' ' -f2 | awk '{system("dig +short "$1)}') | tr ' ' ,)
+NTPSERVERS=$(echo $(grep '^server' /etc/{ntp,chrony}.conf 2>/dev/null | cut -d' ' -f2) | tr ' ' ,)
 MAP=("${MAP[@]}" "INPUT -s $NTPSERVERS -p udp --dport 123 -j SYSTEM")
 MAP=("${MAP[@]}" "OUTPUT -d $NTPSERVERS -p udp --sport 123 -j SYSTEM")
 MAP=("${MAP[@]}" "FORWARD -s $NTPSERVERS -p udp --dport 123 -j SYSTEM")
@@ -167,7 +167,7 @@ fi
 # Download                                                 #
 #----------------------------------------------------------#
 
-WGET="/usr/bin/wget -N --retr-symlinks -P ${CACHE_DIR}"
+WGET="wget -N --retr-symlinks -P ${CACHE_DIR}"
 
 [ ! -e $CACHE_DIR ] && mkdir -p $CACHE_DIR
 if [[ $(find ${CACHE_DIR} -name delegated-*-extended-latest -ctime -$INTERVAL 2>&1) ]]; then
